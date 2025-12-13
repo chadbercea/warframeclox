@@ -101,30 +101,24 @@ export async function GET() {
   // All APIs failed - use calculated fallback
   // Cetus cycle: 150 min total (100 min day + 50 min night)
   const CETUS_DAY_MS = 100 * 60 * 1000;
-  const CETUS_NIGHT_MS = 50 * 60 * 1000;
-  const CETUS_CYCLE_MS = CETUS_DAY_MS + CETUS_NIGHT_MS;
-  // Reference: Known day start from Warframe wiki
-  const CETUS_EPOCH = 1510444800000; // Nov 12, 2017 00:00:00 UTC
+  const CETUS_CYCLE_MS = 150 * 60 * 1000;
+  // Reference: Verified cycle start from Dec 13, 2025 API response
+  const KNOWN_CYCLE_START = 1765616932673;
 
   const now = Date.now();
-  const cyclePos = (now - CETUS_EPOCH) % CETUS_CYCLE_MS;
+  const timeSinceKnown = now - KNOWN_CYCLE_START;
+  const cyclePos = ((timeSinceKnown % CETUS_CYCLE_MS) + CETUS_CYCLE_MS) % CETUS_CYCLE_MS;
+
+  // Calculate current cycle's start
+  const currentCycleStart = now - cyclePos;
+  const currentCycleEnd = currentCycleStart + CETUS_CYCLE_MS;
+
+  // Day is first 100 minutes of the 150-minute cycle
   const isDay = cyclePos < CETUS_DAY_MS;
 
-  let cycleStart: number;
-  let cycleEnd: number;
-
-  if (isDay) {
-    cycleStart = now - cyclePos;
-    cycleEnd = cycleStart + CETUS_DAY_MS;
-  } else {
-    const nightPos = cyclePos - CETUS_DAY_MS;
-    cycleStart = now - nightPos;
-    cycleEnd = cycleStart + CETUS_NIGHT_MS;
-  }
-
   return Response.json({
-    cycleStart,
-    cycleEnd,
+    cycleStart: currentCycleStart,
+    cycleEnd: currentCycleEnd,
     isDay,
     fetchedAt: Date.now(),
     source: 'calculated',
