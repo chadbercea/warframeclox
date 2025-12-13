@@ -1,26 +1,66 @@
 // Server-side API route for Cetus cycle data
-// Uses warframestat.us community API with Warframe API fallback
+// Priority: warframestat.us → official Warframe API → calculated fallback
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Response types for external APIs
 interface WarframeStatCetusResponse {
-  activation: string;
-  expiry: string;
-  isDay: boolean;
-  state: string;
-  timeLeft: string;
+  activation?: string;
+  expiry?: string;
+  isDay?: boolean;
+  state?: string;
+  timeLeft?: string;
 }
 
 interface WorldStateResponse {
   SyndicateMissions?: Array<{
-    Tag: string;
-    Activation: { $date: { $numberLong: string } };
-    Expiry: { $date: { $numberLong: string } };
+    Tag?: string;
+    Activation?: { $date?: { $numberLong?: string } };
+    Expiry?: { $date?: { $numberLong?: string } };
   }>;
 }
 
+// Validation helpers
+function isValidTimestamp(ts: number): boolean {
+  // Must be a reasonable timestamp (between 2020 and 2030)
+  return ts > 1577836800000 && ts < 1893456000000;
+}
+
+function validateWarframeStatResponse(data: WarframeStatCetusResponse): { cycleStart: number; cycleEnd: number; isDay: boolean } | null {
+  if (!data.activation || !data.expiry || typeof data.isDay !== 'boolean') {
+    return null;
+  }
+  const cycleStart = new Date(data.activation).getTime();
+  const cycleEnd = new Date(data.expiry).getTime();
+  if (!isValidTimestamp(cycleStart) || !isValidTimestamp(cycleEnd)) {
+    return null;
+  }
+  if (cycleEnd <= cycleStart) {
+    return null;
+  }
+  return { cycleStart, cycleEnd, isDay: data.isDay };
+}
+
+function validateWorldStateResponse(data: WorldStateResponse): { cycleStart: number; cycleEnd: number } | null {
+  const cetusMission = data.SyndicateMissions?.find(m => m.Tag === 'CetusSyndicate');
+  if (!cetusMission?.Activation?.$date?.$numberLong || !cetusMission?.Expiry?.$date?.$numberLong) {
+    return null;
+  }
+  const cycleStart = parseInt(cetusMission.Activation.$date.$numberLong, 10);
+  const cycleEnd = parseInt(cetusMission.Expiry.$date.$numberLong, 10);
+  if (!isValidTimestamp(cycleStart) || !isValidTimestamp(cycleEnd)) {
+    return null;
+  }
+  if (cycleEnd <= cycleStart) {
+    return null;
+  }
+  return { cycleStart, cycleEnd };
+}
+
 export async function GET() {
+  const startTime = Date.now();
+
   // Try warframestat.us community API first (CORS-friendly, designed for apps)
   try {
     const controller = new AbortController();
@@ -36,16 +76,23 @@ export async function GET() {
     });
 
     clearTimeout(timeout);
+    const responseTime = Date.now() - startTime;
 
     if (response.ok) {
       const data: WarframeStatCetusResponse = await response.json();
-      return Response.json({
-        cycleStart: new Date(data.activation).getTime(),
-        cycleEnd: new Date(data.expiry).getTime(),
-        isDay: data.isDay,
-        fetchedAt: Date.now(),
-        source: 'warframestat',
-      });
+      const validated = validateWarframeStatResponse(data);
+
+      if (validated) {
+        return Response.json({
+          cycleStart: validated.cycleStart,
+          cycleEnd: validated.cycleEnd,
+          isDay: validated.isDay,
+          fetchedAt: Date.now(),
+          source: 'warframestat',
+          responseTime,
+        });
+      }
+      console.error('warframestat.us returned invalid data:', data);
     }
   } catch (error) {
     console.error('warframestat.us failed:', error);
@@ -59,6 +106,7 @@ export async function GET() {
 
   for (const apiUrl of WARFRAME_API_URLS) {
     try {
+      const apiStartTime = Date.now();
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -73,6 +121,7 @@ export async function GET() {
       });
 
       clearTimeout(timeout);
+      const responseTime = Date.now() - apiStartTime;
 
       if (!response.ok) {
         console.error(`API ${apiUrl} returned:`, response.status);
@@ -80,19 +129,25 @@ export async function GET() {
       }
 
       const data: WorldStateResponse = await response.json();
-      const cetusMission = data.SyndicateMissions?.find(m => m.Tag === 'CetusSyndicate');
+      const validated = validateWorldStateResponse(data);
 
-      if (cetusMission) {
-        const cycleStart = parseInt(cetusMission.Activation.$date.$numberLong, 10);
-        const cycleEnd = parseInt(cetusMission.Expiry.$date.$numberLong, 10);
+      if (validated) {
+        // Calculate isDay from cycle position
+        const now = Date.now();
+        const elapsed = now - validated.cycleStart;
+        const CETUS_DAY_MS = 100 * 60 * 1000;
+        const isDay = elapsed < CETUS_DAY_MS;
 
         return Response.json({
-          cycleStart,
-          cycleEnd,
+          cycleStart: validated.cycleStart,
+          cycleEnd: validated.cycleEnd,
+          isDay,
           fetchedAt: Date.now(),
           source: 'warframe-api',
+          responseTime,
         });
       }
+      console.error(`${apiUrl} returned invalid data structure`);
     } catch (error) {
       console.error(`Failed to fetch from ${apiUrl}:`, error);
     }

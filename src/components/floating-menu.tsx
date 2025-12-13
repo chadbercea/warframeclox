@@ -28,7 +28,7 @@ export function FloatingMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { isSupported, isEnabled, permission, toggleNotifications } = useNotifications();
   const { canInstall, install, isInstalled } = usePWAInstall();
-  const { status: apiStatus, checkConnection } = useApiStatus();
+  const { status: apiStatus, source: apiSource, checkConnection } = useApiStatus();
 
   const clearCache = useCallback(async () => {
     if ('caches' in window) {
@@ -160,19 +160,34 @@ export function FloatingMenu() {
                         : '0 0 8px #ef4444',
                   }}
                 />
-                <span
-                  className="text-sm"
-                  style={{
-                    fontFamily: FONTS.notoSans,
-                    color: COLORS.goldPrimary,
-                  }}
-                >
-                  {apiStatus === 'connected'
-                    ? 'Connected'
-                    : apiStatus === 'checking'
-                    ? 'Checking...'
-                    : 'Disconnected'}
-                </span>
+                <div className="flex flex-col">
+                  <span
+                    className="text-sm"
+                    style={{
+                      fontFamily: FONTS.notoSans,
+                      color: COLORS.goldPrimary,
+                    }}
+                  >
+                    {apiStatus === 'connected'
+                      ? 'Connected'
+                      : apiStatus === 'checking'
+                      ? 'Checking...'
+                      : 'Disconnected'}
+                  </span>
+                  {apiStatus === 'connected' && apiSource && (
+                    <span
+                      className="text-xs opacity-60"
+                      style={{
+                        fontFamily: FONTS.notoSans,
+                        color: COLORS.goldPrimary,
+                      }}
+                    >
+                      {apiSource === 'warframestat' && 'via warframestat.us'}
+                      {apiSource === 'warframe-api' && 'via Warframe API'}
+                      {apiSource === 'calculated' && 'using local calc'}
+                    </span>
+                  )}
+                </div>
               </div>
               {/* Reconnect Button */}
               <button
