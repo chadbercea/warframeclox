@@ -11,7 +11,7 @@ interface WorldStateResponse {
 
 export async function GET() {
   try {
-    const response = await fetch('https://content.warframe.com/dynamic/worldState.php', {
+    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
       next: { revalidate: 60 }, // Cache for 60 seconds
     });
 
