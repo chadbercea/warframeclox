@@ -43,6 +43,26 @@ Browser notifications fire at two points:
 
 Notifications work even when the tab is backgrounded.
 
+## API Health Check
+
+Verify the API is working:
+
+```bash
+curl -s "https://warframeclox.vercel.app/api/cetus" | jq
+```
+
+Or open https://warframeclox.vercel.app/api/cetus in your browser.
+
+Response fields:
+- `cycleStart` / `cycleEnd` - Unix timestamps (ms) for current cycle
+- `isDay` - Boolean indicating day/night
+- `fetchedAt` - When the response was generated
+- `source` - Which data source provided the cycle data:
+  - `warframestat` - warframestat.us community API
+  - `warframe-api` - Official Warframe API
+  - `calculated` - Local fallback calculation
+- `responseTime` - API response time in ms (not present for calculated)
+
 ## Development
 
 ```bash
