@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
+import { useMouseParallax } from '@/hooks/use-mouse-parallax';
 
 // Color tokens - mapped from CSS custom properties
 // See globals.css for token definitions
@@ -50,6 +51,7 @@ export function CetusClock() {
   const [starburstRotation, setStarburstRotation] = useState(0);
   const animationRef = useRef<number | null>(null);
   const starburstRef = useRef<number | null>(null);
+  const parallax = useMouseParallax();
 
   // Sync with API and get cycle data
   useEffect(() => {
@@ -188,14 +190,19 @@ export function CetusClock() {
 
   return (
     <>
-      {/* Full-screen background decorations layer */}
+      {/* Full-screen background decorations layer - furthest back */}
       {viewportSize.width > 0 && (
       <svg
         width={viewportSize.width}
         height={viewportSize.height}
         viewBox={`0 0 ${viewportSize.width} ${viewportSize.height}`}
         className="fixed inset-0 pointer-events-none"
-        style={{ zIndex: 0 }}
+        style={{
+          zIndex: 0,
+          transform: `perspective(1000px) translate3d(${parallax.background.translateX}px, ${parallax.background.translateY}px, ${parallax.background.translateZ}px) rotateX(${parallax.background.rotateX}deg) rotateY(${parallax.background.rotateY}deg)`,
+          transition: 'transform 0.15s ease-out',
+          transformOrigin: 'center center',
+        }}
       >
         {/* Radiating starburst lines - Orokin alien aesthetic - slow counter-clockwise rotation */}
         <g
@@ -362,161 +369,184 @@ export function CetusClock() {
       </svg>
       )}
 
-      {/* Clock container */}
+      {/* Clock container - 3D scene with layered parallax */}
       <div
         className="relative flex items-center justify-center"
-        style={{ width: size, height: size, zIndex: 1 }}
+        style={{
+          width: size,
+          height: size,
+          zIndex: 1,
+          perspective: '1000px',
+          transformStyle: 'preserve-3d',
+        }}
       >
+        {/* Circles layer - middle depth */}
         <svg
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
           className="absolute inset-0"
+          style={{
+            transform: `translate3d(${parallax.circles.translateX}px, ${parallax.circles.translateY}px, ${parallax.circles.translateZ}px) rotateX(${parallax.circles.rotateX}deg) rotateY(${parallax.circles.rotateY}deg)`,
+            transition: 'transform 0.15s ease-out',
+            transformOrigin: 'center center',
+          }}
         >
-        {/* Outer track - arc with gap around disc */}
-        <path
-          d={createArcWithGap(outerR, positions.outer)}
-          fill="none"
-          stroke={COLORS.goldPrimary}
-          strokeWidth={OUTER_STROKE}
-        />
-        {/* Middle track - arc with gap around disc */}
-        <path
-          d={createArcWithGap(middleR, positions.middle)}
-          fill="none"
-          stroke={COLORS.goldPrimary}
-          strokeWidth={MIDDLE_STROKE}
-        />
-        {/* Inner track - arc with gap around disc (softer to match disc) */}
-        <path
-          d={createArcWithGap(innerR, positions.inner)}
-          fill="none"
-          stroke={COLORS.goldPrimary}
-          strokeWidth={INNER_STROKE}
-          opacity={0.2}
-          filter="url(#innerDiscGlow)"
-        />
-
-        {/* Outer disc - fill: --color-gold-primary */}
-        <circle
-          cx={outerPos.x}
-          cy={outerPos.y}
-          r={discR}
-          fill={COLORS.goldPrimary}
-        />
-
-        {/* Middle disc - fill: --color-gold-primary */}
-        <circle
-          cx={middlePos.x}
-          cy={middlePos.y}
-          r={discR}
-          fill={COLORS.goldPrimary}
-        />
-
-        {/* Inner disc (seconds) - smaller, softer, with glow */}
-        <defs>
-          <filter id="innerDiscGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <circle
-          cx={innerPos.x}
-          cy={innerPos.y}
-          r={innerDiscR}
-          fill={COLORS.goldPrimary}
-          opacity={0.2}
-          filter="url(#innerDiscGlow)"
-        />
-
-        {/* Center typography */}
-
-        {/* Plains of Eidolon title - Flareserif font */}
-        <text
-          x={center}
-          y={center - size * 0.09}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={COLORS.goldPrimary}
-          fontSize={size * 0.032}
-          fontFamily={FONTS.flareserif}
-          fontWeight={700}
-          letterSpacing="0.12em"
-        >
-          PLAINS OF EIDOLON
-        </text>
-
-        {/* Time countdown - Ailerons font */}
-        <text
-          x={center}
-          y={center + size * 0.02}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={COLORS.goldPrimary}
-          fontSize={size * 0.14}
-          fontFamily={FONTS.ailerons}
-          fontWeight={400}
-          letterSpacing="0.15em"
-        >
-          {timeLeft}
-        </text>
-
-        {/* Day/Night indicator with Orokin lines */}
-        <g>
-          {/* Left decorative line */}
-          <line
-            x1={center - size * 0.18}
-            y1={center + size * 0.11}
-            x2={center - size * 0.06}
-            y2={center + size * 0.11}
-            stroke={COLORS.goldPrimary}
-            strokeWidth={1}
-            opacity={0.6}
-          />
-          {/* Left diamond accent */}
+          {/* Outer track - arc with gap around disc */}
           <path
-            d={`M ${center - size * 0.19} ${center + size * 0.11} l -3 -3 l -3 3 l 3 3 z`}
-            fill={COLORS.goldPrimary}
-            opacity={0.6}
+            d={createArcWithGap(outerR, positions.outer)}
+            fill="none"
+            stroke={COLORS.goldPrimary}
+            strokeWidth={OUTER_STROKE}
+          />
+          {/* Middle track - arc with gap around disc */}
+          <path
+            d={createArcWithGap(middleR, positions.middle)}
+            fill="none"
+            stroke={COLORS.goldPrimary}
+            strokeWidth={MIDDLE_STROKE}
+          />
+          {/* Inner track - arc with gap around disc (softer to match disc) */}
+          <path
+            d={createArcWithGap(innerR, positions.inner)}
+            fill="none"
+            stroke={COLORS.goldPrimary}
+            strokeWidth={INNER_STROKE}
+            opacity={0.2}
+            filter="url(#innerDiscGlow)"
           />
 
-          {/* Day/Night label - Noto Sans font */}
+          {/* Outer disc - fill: --color-gold-primary */}
+          <circle
+            cx={outerPos.x}
+            cy={outerPos.y}
+            r={discR}
+            fill={COLORS.goldPrimary}
+          />
+
+          {/* Middle disc - fill: --color-gold-primary */}
+          <circle
+            cx={middlePos.x}
+            cy={middlePos.y}
+            r={discR}
+            fill={COLORS.goldPrimary}
+          />
+
+          {/* Inner disc (seconds) - smaller, softer, with glow */}
+          <defs>
+            <filter id="innerDiscGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <circle
+            cx={innerPos.x}
+            cy={innerPos.y}
+            r={innerDiscR}
+            fill={COLORS.goldPrimary}
+            opacity={0.2}
+            filter="url(#innerDiscGlow)"
+          />
+        </svg>
+
+        {/* Text layer - front, closest to viewer */}
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="absolute inset-0"
+          style={{
+            transform: `translate3d(${parallax.text.translateX}px, ${parallax.text.translateY}px, ${parallax.text.translateZ}px) rotateX(${parallax.text.rotateX}deg) rotateY(${parallax.text.rotateY}deg)`,
+            transition: 'transform 0.15s ease-out',
+            transformOrigin: 'center center',
+          }}
+        >
+          {/* Plains of Eidolon title - Flareserif font */}
           <text
             x={center}
-            y={center + size * 0.115}
+            y={center - size * 0.09}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill={COLORS.textSecondary}
-            fontSize={size * 0.028}
-            fontFamily={FONTS.notoSans}
+            fill={COLORS.goldPrimary}
+            fontSize={size * 0.032}
+            fontFamily={FONTS.flareserif}
             fontWeight={700}
-            letterSpacing="0.2em"
+            letterSpacing="0.12em"
           >
-            {isDay ? 'DAY' : 'NIGHT'}
+            PLAINS OF EIDOLON
           </text>
 
-          {/* Right decorative line */}
-          <line
-            x1={center + size * 0.06}
-            y1={center + size * 0.11}
-            x2={center + size * 0.18}
-            y2={center + size * 0.11}
-            stroke={COLORS.goldPrimary}
-            strokeWidth={1}
-            opacity={0.6}
-          />
-          {/* Right diamond accent */}
-          <path
-            d={`M ${center + size * 0.19} ${center + size * 0.11} l 3 -3 l 3 3 l -3 3 z`}
+          {/* Time countdown - Ailerons font */}
+          <text
+            x={center}
+            y={center + size * 0.02}
+            textAnchor="middle"
+            dominantBaseline="middle"
             fill={COLORS.goldPrimary}
-            opacity={0.6}
-          />
-        </g>
-      </svg>
-    </div>
+            fontSize={size * 0.14}
+            fontFamily={FONTS.ailerons}
+            fontWeight={400}
+            letterSpacing="0.15em"
+          >
+            {timeLeft}
+          </text>
+
+          {/* Day/Night indicator with Orokin lines */}
+          <g>
+            {/* Left decorative line */}
+            <line
+              x1={center - size * 0.18}
+              y1={center + size * 0.11}
+              x2={center - size * 0.06}
+              y2={center + size * 0.11}
+              stroke={COLORS.goldPrimary}
+              strokeWidth={1}
+              opacity={0.6}
+            />
+            {/* Left diamond accent */}
+            <path
+              d={`M ${center - size * 0.19} ${center + size * 0.11} l -3 -3 l -3 3 l 3 3 z`}
+              fill={COLORS.goldPrimary}
+              opacity={0.6}
+            />
+
+            {/* Day/Night label - Noto Sans font */}
+            <text
+              x={center}
+              y={center + size * 0.115}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill={COLORS.textSecondary}
+              fontSize={size * 0.028}
+              fontFamily={FONTS.notoSans}
+              fontWeight={700}
+              letterSpacing="0.2em"
+            >
+              {isDay ? 'DAY' : 'NIGHT'}
+            </text>
+
+            {/* Right decorative line */}
+            <line
+              x1={center + size * 0.06}
+              y1={center + size * 0.11}
+              x2={center + size * 0.18}
+              y2={center + size * 0.11}
+              stroke={COLORS.goldPrimary}
+              strokeWidth={1}
+              opacity={0.6}
+            />
+            {/* Right diamond accent */}
+            <path
+              d={`M ${center + size * 0.19} ${center + size * 0.11} l 3 -3 l 3 3 l -3 3 z`}
+              fill={COLORS.goldPrimary}
+              opacity={0.6}
+            />
+          </g>
+        </svg>
+      </div>
     </>
   );
 }

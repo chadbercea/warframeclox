@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useNotifications } from '@/hooks/use-notifications';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
+import { useApiStatus } from '@/hooks/use-api-status';
 
 // Color tokens matching the design system
 const COLORS = {
@@ -19,7 +20,7 @@ const FONTS = {
 // Dimensions
 const BUTTON_SIZE = 48;
 const SIDEBAR_WIDTH = 280;
-const SIDEBAR_HEIGHT = 400;
+const SIDEBAR_HEIGHT = 480;
 const POSITION_TOP = 16;
 const POSITION_LEFT = 16;
 
@@ -27,6 +28,7 @@ export function FloatingMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { isSupported, isEnabled, permission, toggleNotifications } = useNotifications();
   const { canInstall, install, isInstalled } = usePWAInstall();
+  const { status: apiStatus, checkConnection } = useApiStatus();
 
   const clearCache = useCallback(async () => {
     if ('caches' in window) {
@@ -125,6 +127,91 @@ export function FloatingMenu() {
             >
               WARFRAME CLOX
             </h1>
+          </div>
+
+          {/* API Status */}
+          <div className="mb-4 pb-4 border-b" style={{ borderColor: 'rgba(201, 169, 97, 0.3)' }}>
+            <div
+              className="text-xs uppercase tracking-widest mb-3 opacity-60"
+              style={{
+                fontFamily: FONTS.notoSans,
+                color: COLORS.goldPrimary,
+              }}
+            >
+              API Status
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {/* Status Dot */}
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      apiStatus === 'connected'
+                        ? '#22c55e'
+                        : apiStatus === 'checking'
+                        ? '#eab308'
+                        : '#ef4444',
+                    boxShadow:
+                      apiStatus === 'connected'
+                        ? '0 0 8px #22c55e'
+                        : apiStatus === 'checking'
+                        ? '0 0 8px #eab308'
+                        : '0 0 8px #ef4444',
+                  }}
+                />
+                <span
+                  className="text-sm"
+                  style={{
+                    fontFamily: FONTS.notoSans,
+                    color: COLORS.goldPrimary,
+                  }}
+                >
+                  {apiStatus === 'connected'
+                    ? 'Connected'
+                    : apiStatus === 'checking'
+                    ? 'Checking...'
+                    : 'Disconnected'}
+                </span>
+              </div>
+              {/* Reconnect Button */}
+              <button
+                onClick={checkConnection}
+                disabled={apiStatus === 'checking'}
+                className="p-1.5 rounded transition-all duration-200"
+                style={{
+                  opacity: apiStatus === 'checking' ? 0.4 : 1,
+                  cursor: apiStatus === 'checking' ? 'not-allowed' : 'pointer',
+                }}
+                title="Check connection"
+                onMouseEnter={(e) => {
+                  if (apiStatus !== 'checking') {
+                    e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {/* Refresh Icon */}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={COLORS.goldPrimary}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={apiStatus === 'checking' ? 'animate-spin' : ''}
+                >
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                  <path d="M3 21v-5h5" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Menu Items */}
