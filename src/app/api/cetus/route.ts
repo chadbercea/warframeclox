@@ -98,8 +98,35 @@ export async function GET() {
     }
   }
 
-  return Response.json(
-    { error: 'All API sources failed' },
-    { status: 502 }
-  );
+  // All APIs failed - use calculated fallback
+  // Cetus cycle: 150 min total (100 min day + 50 min night)
+  const CETUS_DAY_MS = 100 * 60 * 1000;
+  const CETUS_NIGHT_MS = 50 * 60 * 1000;
+  const CETUS_CYCLE_MS = CETUS_DAY_MS + CETUS_NIGHT_MS;
+  // Reference: Known day start from Warframe wiki
+  const CETUS_EPOCH = 1510444800000; // Nov 12, 2017 00:00:00 UTC
+
+  const now = Date.now();
+  const cyclePos = (now - CETUS_EPOCH) % CETUS_CYCLE_MS;
+  const isDay = cyclePos < CETUS_DAY_MS;
+
+  let cycleStart: number;
+  let cycleEnd: number;
+
+  if (isDay) {
+    cycleStart = now - cyclePos;
+    cycleEnd = cycleStart + CETUS_DAY_MS;
+  } else {
+    const nightPos = cyclePos - CETUS_DAY_MS;
+    cycleStart = now - nightPos;
+    cycleEnd = cycleStart + CETUS_NIGHT_MS;
+  }
+
+  return Response.json({
+    cycleStart,
+    cycleEnd,
+    isDay,
+    fetchedAt: Date.now(),
+    source: 'calculated',
+  });
 }
