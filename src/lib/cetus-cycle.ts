@@ -29,19 +29,15 @@ interface WorldStateResponse {
   }>;
 }
 
-// Fetch cycle data from official Warframe API
+// Fetch cycle data via our API route (avoids CORS issues)
 export async function fetchCetusCycleFromApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
   try {
-    const response = await fetch('https://content.warframe.com/dynamic/worldState.php');
+    const response = await fetch('/api/cetus');
     if (!response.ok) return null;
 
-    const data: WorldStateResponse = await response.json();
-    const cetusMission = data.SyndicateMissions?.find(m => m.Tag === 'CetusSyndicate');
-
-    if (cetusMission) {
-      const cycleStart = parseInt(cetusMission.Activation.$date.$numberLong, 10);
-      const cycleEnd = parseInt(cetusMission.Expiry.$date.$numberLong, 10);
-      return { cycleStart, cycleEnd };
+    const data = await response.json();
+    if (data.cycleStart && data.cycleEnd) {
+      return { cycleStart: data.cycleStart, cycleEnd: data.cycleEnd };
     }
   } catch (error) {
     console.error('Failed to fetch Cetus cycle from API:', error);
@@ -126,10 +122,8 @@ export function formatTimeLeft(ms: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  // Always show hours in format 00:00:00
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
 export function formatNextCycleTime(date: Date): string {

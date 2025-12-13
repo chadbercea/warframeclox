@@ -14,6 +14,34 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
+const ailerons = localFont({
+  src: "./fonts/ailerons.ttf",
+  variable: "--font-ailerons",
+  weight: "400",
+});
+
+const notoSans = localFont({
+  src: [
+    {
+      path: "./fonts/noto-sans.regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/noto-sans.bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-noto-sans",
+});
+
+const flareserif = localFont({
+  src: "./fonts/flareserif-821-bold.otf",
+  variable: "--font-flareserif",
+  weight: "700",
+});
+
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
@@ -65,7 +93,8 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${ailerons.variable} ${notoSans.variable} ${flareserif.variable} antialiased`}
+        suppressHydrationWarning
       >
         <ServiceWorkerProvider>
           {children}

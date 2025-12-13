@@ -37,6 +37,36 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+
+    /* ========================================
+     * Warframe Clox Design System Color Tokens
+     * ======================================== */
+
+    /* Gold palette - Orokin aesthetic */
+    --color-gold-primary: #C9A961;      /* Circle strokes, disc fills, frame lines */
+    --color-gold-hover: #D4B76A;        /* Hover states, pulse animations */
+    --color-gold-glow: rgba(201, 169, 97, 0.3); /* Disc glow, text glow, shadows */
+
+    /* Background colors */
+    --color-background-base: #0a0a0c;   /* Page background */
+    --color-space-black: #000000;       /* Deep space base layer */
+
+    /* Nebula gradients - blue spectrum */
+    --color-nebula-blue-1: #1a2744;     /* Darkest blue */
+    --color-nebula-blue-2: #243554;     /* Mid blue */
+    --color-nebula-blue-3: #2d4a6e;     /* Lightest blue */
+
+    /* Nebula gradients - purple spectrum */
+    --color-nebula-purple-1: #1f1a2e;   /* Darkest purple */
+    --color-nebula-purple-2: #2a1f3d;   /* Mid purple */
+    --color-nebula-purple-3: #3a2f4d;   /* Lightest purple */
+
+    /* Star field */
+    --color-star-white: #FFFFFF;        /* Star color (use with 0.3-0.9 opacity) */
+
+    /* Typography */
+    --color-text-primary: #FFFFFF;      /* Time display */
+    --color-text-secondary: #C9A961;    /* Cycle label (Day/Night) */
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -75,4 +105,52 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ========================================
+ * Star Twinkle Animations
+ * ======================================== */
+
+/* Multiple twinkle animations with different timings for variety */
+@keyframes twinkle-1 {
+  0%, 100% { opacity: var(--star-base-opacity, 0.5); }
+  50% { opacity: calc(var(--star-base-opacity, 0.5) * 0.3); }
+}
+
+@keyframes twinkle-2 {
+  0%, 100% { opacity: var(--star-base-opacity, 0.5); }
+  30% { opacity: calc(var(--star-base-opacity, 0.5) * 0.4); }
+  70% { opacity: var(--star-base-opacity, 0.5); }
+}
+
+@keyframes twinkle-3 {
+  0%, 100% { opacity: var(--star-base-opacity, 0.5); }
+  25% { opacity: calc(var(--star-base-opacity, 0.5) * 1.2); }
+  75% { opacity: calc(var(--star-base-opacity, 0.5) * 0.5); }
+}
+
+.star-twinkle-1 {
+  animation: twinkle-1 4s ease-in-out infinite;
+}
+
+.star-twinkle-2 {
+  animation: twinkle-2 6s ease-in-out infinite;
+}
+
+.star-twinkle-3 {
+  animation: twinkle-3 8s ease-in-out infinite;
+}
+
+/* ========================================
+ * CSS Noise Texture
+ * ======================================== */
+
+.noise-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }

@@ -1,20 +1,16 @@
-import { Header } from '@/components/header';
-import { CetusCycleCard } from '@/components/cetus-cycle-card';
+import { CetusClock } from '@/components/cetus-clock';
 import { Footer } from '@/components/footer';
+import { SpaceBackground } from '@/components/space-background';
+import { FloatingMenu } from '@/components/floating-menu';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background flex flex-col">
-      <Header />
+    <main className="min-h-screen flex flex-col relative" style={{ backgroundColor: '#000000' }}>
+      <SpaceBackground />
+      <FloatingMenu />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
-        {/* Intro text for first-time visitors */}
-        <p className="text-center text-muted-foreground text-sm mb-6 max-w-md">
-          Track the Cetus day/night cycle in real-time. Enable notifications to get alerts before transitions.
-        </p>
-
-        <CetusCycleCard />
-
+      <div className="flex-1 flex flex-col items-center justify-center relative z-10">
+        <CetusClock />
         <Footer />
       </div>
     </main>
