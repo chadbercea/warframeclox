@@ -12,15 +12,17 @@ interface WorldStateResponse {
 export async function GET() {
   try {
     const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
-      next: { revalidate: 60 }, // Cache for 60 seconds
+      cache: 'no-store', // Disable caching to ensure fresh requests
       headers: {
         'User-Agent': 'WarframeClox/1.0 (Cetus Cycle Tracker)',
+        'Accept': 'application/json',
       },
     });
 
     if (!response.ok) {
+      console.error('Warframe API returned:', response.status, response.statusText);
       return Response.json(
-        { error: 'Failed to fetch from Warframe API' },
+        { error: 'Failed to fetch from Warframe API', status: response.status },
         { status: response.status }
       );
     }
@@ -46,7 +48,7 @@ export async function GET() {
   } catch (error) {
     console.error('Cetus API error:', error);
     return Response.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: String(error) },
       { status: 500 }
     );
   }
