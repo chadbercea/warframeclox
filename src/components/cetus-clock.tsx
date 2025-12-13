@@ -49,8 +49,10 @@ export function CetusClock() {
   const [isDay, setIsDay] = useState(true);
   const [timeLeft, setTimeLeft] = useState('--:--');
   const [starburstRotation, setStarburstRotation] = useState(0);
+  const [outerRingRotation, setOuterRingRotation] = useState(0);
   const animationRef = useRef<number | null>(null);
   const starburstRef = useRef<number | null>(null);
+  const outerRingRef = useRef<number | null>(null);
   const parallax = useMouseParallax();
 
   // Sync with API and get cycle data
@@ -125,6 +127,20 @@ export function CetusClock() {
     };
   }, []);
 
+  // Very slow clockwise outer ring rotation (180 seconds per full rotation)
+  useEffect(() => {
+    const rotateOuterRing = () => {
+      setOuterRingRotation(prev => (prev + 0.033) % 360); // +0.033 degrees per frame ≈ 180s per rotation
+      outerRingRef.current = requestAnimationFrame(rotateOuterRing);
+    };
+    outerRingRef.current = requestAnimationFrame(rotateOuterRing);
+    return () => {
+      if (outerRingRef.current) {
+        cancelAnimationFrame(outerRingRef.current);
+      }
+    };
+  }, []);
+
   // Responsive sizing
   useEffect(() => {
     const updateSize = () => {
@@ -190,7 +206,82 @@ export function CetusClock() {
 
   return (
     <>
-      {/* Full-screen background decorations layer - furthest back */}
+      {/* Layer 4 (Part 1): Deep background layer - furthest back with glow effect */}
+      {viewportSize.width > 0 && (
+      <svg
+        width={viewportSize.width}
+        height={viewportSize.height}
+        viewBox={`0 0 ${viewportSize.width} ${viewportSize.height}`}
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: -1,
+          transform: `perspective(1000px) translate3d(${parallax.background.translateX * 0.3}px, ${parallax.background.translateY * 0.3}px, -100px) rotateX(${parallax.background.rotateX * 0.3}deg) rotateY(${parallax.background.rotateY * 0.3}deg)`,
+          transition: 'transform 0.2s ease-out',
+          transformOrigin: 'center center',
+        }}
+      >
+        {/* Deep layer glow filter */}
+        <defs>
+          <filter id="deepGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Outer ethereal ring - very far back with heavy blur */}
+        <circle
+          cx={bgCenter.x}
+          cy={bgCenter.y}
+          r={bgRadius * 2.2}
+          fill="none"
+          stroke={COLORS.goldPrimary}
+          strokeWidth={2}
+          opacity={0.08}
+          filter="url(#deepGlow)"
+          style={{
+            transform: `rotate(${-outerRingRotation * 0.5}deg)`,
+            transformOrigin: `${bgCenter.x}px ${bgCenter.y}px`,
+          }}
+        />
+
+        {/* Secondary ethereal ring */}
+        <circle
+          cx={bgCenter.x}
+          cy={bgCenter.y}
+          r={bgRadius * 2.0}
+          fill="none"
+          stroke={COLORS.goldPrimary}
+          strokeWidth={1}
+          strokeDasharray={`${bgRadius * 0.2} ${bgRadius * 0.4}`}
+          opacity={0.06}
+          filter="url(#deepGlow)"
+          style={{
+            transform: `rotate(${outerRingRotation * 0.3}deg)`,
+            transformOrigin: `${bgCenter.x}px ${bgCenter.y}px`,
+          }}
+        />
+
+        {/* Radial gradient glow effect in center */}
+        <defs>
+          <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={COLORS.goldPrimary} stopOpacity="0.05" />
+            <stop offset="70%" stopColor={COLORS.goldPrimary} stopOpacity="0.02" />
+            <stop offset="100%" stopColor={COLORS.goldPrimary} stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <circle
+          cx={bgCenter.x}
+          cy={bgCenter.y}
+          r={bgRadius * 1.5}
+          fill="url(#centerGlow)"
+        />
+      </svg>
+      )}
+
+      {/* Full-screen background decorations layer - main geometric layer */}
       {viewportSize.width > 0 && (
       <svg
         width={viewportSize.width}
@@ -204,6 +295,23 @@ export function CetusClock() {
           transformOrigin: 'center center',
         }}
       >
+        {/* SVG filter definitions for glow effects */}
+        <defs>
+          <filter id="goldGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="subtleGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         {/* Radiating starburst lines - Orokin alien aesthetic - slow counter-clockwise rotation */}
         <g
           stroke={COLORS.goldPrimary}
@@ -264,6 +372,110 @@ export function CetusClock() {
           })}
         </g>
 
+        {/* Layer 1: Outer Ring - Orokin architectural ring with slow clockwise rotation */}
+        <g
+          stroke={COLORS.goldPrimary}
+          strokeWidth={1}
+          fill="none"
+          opacity={0.3}
+          style={{
+            transform: `rotate(${outerRingRotation}deg)`,
+            transformOrigin: `${bgCenter.x}px ${bgCenter.y}px`,
+          }}
+        >
+          {/* Main outer ring circle */}
+          <circle
+            cx={bgCenter.x}
+            cy={bgCenter.y}
+            r={bgRadius * 1.7}
+            strokeDasharray={`${bgRadius * 0.3} ${bgRadius * 0.08} ${bgRadius * 0.1} ${bgRadius * 0.08}`}
+          />
+
+          {/* Secondary ring with different dash pattern */}
+          <circle
+            cx={bgCenter.x}
+            cy={bgCenter.y}
+            r={bgRadius * 1.75}
+            strokeDasharray={`${bgRadius * 0.05} ${bgRadius * 0.15}`}
+            opacity={0.6}
+          />
+
+          {/* Orokin notches/brackets around the ring */}
+          {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle) => {
+            const rad = ((angle - 90) * Math.PI) / 180;
+            const innerRadius = bgRadius * 1.65;
+            const outerRadius = bgRadius * 1.8;
+            const x1 = bgCenter.x + innerRadius * Math.cos(rad);
+            const y1 = bgCenter.y + innerRadius * Math.sin(rad);
+            const x2 = bgCenter.x + outerRadius * Math.cos(rad);
+            const y2 = bgCenter.y + outerRadius * Math.sin(rad);
+
+            // Create small bracket shapes at each position
+            const perpRad = rad + Math.PI / 2;
+            const bracketWidth = bgRadius * 0.03;
+
+            return (
+              <g key={`notch-${angle}`}>
+                {/* Radial line */}
+                <line x1={x1} y1={y1} x2={x2} y2={y2} />
+                {/* Inner bracket arms */}
+                <line
+                  x1={x1 + bracketWidth * Math.cos(perpRad)}
+                  y1={y1 + bracketWidth * Math.sin(perpRad)}
+                  x2={x1}
+                  y2={y1}
+                />
+                <line
+                  x1={x1 - bracketWidth * Math.cos(perpRad)}
+                  y1={y1 - bracketWidth * Math.sin(perpRad)}
+                  x2={x1}
+                  y2={y1}
+                />
+              </g>
+            );
+          })}
+
+          {/* Arc segments between notches - creates Orokin architectural feel */}
+          {[15, 45, 75, 105, 135, 165, 195, 225, 255, 285, 315, 345].map((angle) => {
+            const rad = ((angle - 90) * Math.PI) / 180;
+            const arcRadius = bgRadius * 1.72;
+            const arcLength = bgRadius * 0.15;
+            const startX = bgCenter.x + arcRadius * Math.cos(rad - 0.08);
+            const startY = bgCenter.y + arcRadius * Math.sin(rad - 0.08);
+            const endX = bgCenter.x + arcRadius * Math.cos(rad + 0.08);
+            const endY = bgCenter.y + arcRadius * Math.sin(rad + 0.08);
+
+            return (
+              <path
+                key={`arc-${angle}`}
+                d={`M ${startX} ${startY} A ${arcRadius} ${arcRadius} 0 0 1 ${endX} ${endY}`}
+                strokeWidth={2}
+                opacity={0.8}
+              />
+            );
+          })}
+
+          {/* Diamond markers at cardinal points - with glow effect */}
+          {[0, 90, 180, 270].map((angle) => {
+            const rad = ((angle - 90) * Math.PI) / 180;
+            const markerRadius = bgRadius * 1.82;
+            const cx = bgCenter.x + markerRadius * Math.cos(rad);
+            const cy = bgCenter.y + markerRadius * Math.sin(rad);
+            const diamondSize = 5;
+
+            return (
+              <path
+                key={`diamond-${angle}`}
+                d={`M ${cx} ${cy - diamondSize} l ${diamondSize} ${diamondSize} l -${diamondSize} ${diamondSize} l -${diamondSize} -${diamondSize} z`}
+                fill={COLORS.goldPrimary}
+                stroke="none"
+                opacity={1}
+                filter="url(#subtleGlow)"
+              />
+            );
+          })}
+        </g>
+
         {/* Warframe-style geometric frame decorations - outer thin line */}
         <g stroke={COLORS.goldPrimary} strokeWidth={1} fill="none" opacity={0.4}>
           {/* Top arch frame - outer */}
@@ -315,56 +527,288 @@ export function CetusClock() {
           <line x1={bgCenter.x + bgRadius * 1.1} y1={bgCenter.y + bgRadius * 0.9} x2={bgCenter.x + bgRadius * 1.5} y2={bgCenter.y + bgRadius * 1.3} />
           <line x1={bgCenter.x + bgRadius * 1.0} y1={bgCenter.y + bgRadius * 1.0} x2={bgCenter.x + bgRadius * 1.3} y2={bgCenter.y + bgRadius * 1.4} />
 
-          {/* Accent dots */}
-          <circle cx={bgCenter.x} cy={bgCenter.y - bgRadius * 1.4} r={3} fill={COLORS.goldPrimary} stroke="none" />
-          <circle cx={bgCenter.x - bgRadius * 1.5} cy={bgCenter.y} r={3} fill={COLORS.goldPrimary} stroke="none" />
-          <circle cx={bgCenter.x + bgRadius * 1.5} cy={bgCenter.y} r={3} fill={COLORS.goldPrimary} stroke="none" />
-          <circle cx={bgCenter.x} cy={bgCenter.y + bgRadius * 1.3} r={3} fill={COLORS.goldPrimary} stroke="none" />
+          {/* Accent dots - with glow */}
+          <circle cx={bgCenter.x} cy={bgCenter.y - bgRadius * 1.4} r={3} fill={COLORS.goldPrimary} stroke="none" filter="url(#subtleGlow)" />
+          <circle cx={bgCenter.x - bgRadius * 1.5} cy={bgCenter.y} r={3} fill={COLORS.goldPrimary} stroke="none" filter="url(#subtleGlow)" />
+          <circle cx={bgCenter.x + bgRadius * 1.5} cy={bgCenter.y} r={3} fill={COLORS.goldPrimary} stroke="none" filter="url(#subtleGlow)" />
+          <circle cx={bgCenter.x} cy={bgCenter.y + bgRadius * 1.3} r={3} fill={COLORS.goldPrimary} stroke="none" filter="url(#subtleGlow)" />
 
           {/* Horizontal accent lines */}
           <line x1={bgCenter.x - bgRadius * 1.2} y1={bgCenter.y} x2={bgCenter.x - bgRadius * 1.45} y2={bgCenter.y} />
           <line x1={bgCenter.x + bgRadius * 1.2} y1={bgCenter.y} x2={bgCenter.x + bgRadius * 1.45} y2={bgCenter.y} />
 
-          {/* Top triangle marker */}
-          <path d={`M ${bgCenter.x - 5} ${bgCenter.y - bgRadius * 1.35} L ${bgCenter.x} ${bgCenter.y - bgRadius * 1.4} L ${bgCenter.x + 5} ${bgCenter.y - bgRadius * 1.35} Z`} fill={COLORS.goldPrimary} stroke="none" />
+          {/* Top triangle marker - with glow */}
+          <path d={`M ${bgCenter.x - 5} ${bgCenter.y - bgRadius * 1.35} L ${bgCenter.x} ${bgCenter.y - bgRadius * 1.4} L ${bgCenter.x + 5} ${bgCenter.y - bgRadius * 1.35} Z`} fill={COLORS.goldPrimary} stroke="none" filter="url(#subtleGlow)" />
         </g>
 
-        {/* Inner contour - 4px thick line, offset inward by ~8px */}
-        <g stroke={COLORS.goldPrimary} strokeWidth={4} fill="none" opacity={0.25}>
-          {/* Top arch frame - inner contour (scaled 0.95 toward center) */}
+        {/* Inner contour - 10px thick line, close to thin outer line - inverse parallax */}
+        <g
+          stroke={COLORS.goldPrimary}
+          strokeWidth={10}
+          fill="none"
+          opacity={0.15}
+          style={{
+            transform: `translate(${-parallax.background.translateX * 1.5}px, ${-parallax.background.translateY * 1.5}px)`,
+            transition: 'transform 0.2s ease-out',
+          }}
+        >
+          {/* Top arch frame - inner contour (scaled 0.98 toward center - much closer) */}
           <path d={`
-            M ${bgCenter.x - bgRadius * 1.045} ${bgCenter.y - bgRadius * 0.54}
-            Q ${bgCenter.x - bgRadius * 0.76} ${bgCenter.y - bgRadius * 1.235}, ${bgCenter.x} ${bgCenter.y - bgRadius * 1.33}
-            Q ${bgCenter.x + bgRadius * 0.76} ${bgCenter.y - bgRadius * 1.235}, ${bgCenter.x + bgRadius * 1.045} ${bgCenter.y - bgRadius * 0.54}
+            M ${bgCenter.x - bgRadius * 1.08} ${bgCenter.y - bgRadius * 0.57}
+            Q ${bgCenter.x - bgRadius * 0.78} ${bgCenter.y - bgRadius * 1.27}, ${bgCenter.x} ${bgCenter.y - bgRadius * 1.37}
+            Q ${bgCenter.x + bgRadius * 0.78} ${bgCenter.y - bgRadius * 1.27}, ${bgCenter.x + bgRadius * 1.08} ${bgCenter.y - bgRadius * 0.57}
           `} />
           <path d={`
-            M ${bgCenter.x - bgRadius * 0.855} ${bgCenter.y - bgRadius * 0.45}
-            Q ${bgCenter.x - bgRadius * 0.57} ${bgCenter.y - bgRadius * 1.045}, ${bgCenter.x} ${bgCenter.y - bgRadius * 1.14}
-            Q ${bgCenter.x + bgRadius * 0.57} ${bgCenter.y - bgRadius * 1.045}, ${bgCenter.x + bgRadius * 0.855} ${bgCenter.y - bgRadius * 0.45}
+            M ${bgCenter.x - bgRadius * 0.88} ${bgCenter.y - bgRadius * 0.48}
+            Q ${bgCenter.x - bgRadius * 0.59} ${bgCenter.y - bgRadius * 1.08}, ${bgCenter.x} ${bgCenter.y - bgRadius * 1.18}
+            Q ${bgCenter.x + bgRadius * 0.59} ${bgCenter.y - bgRadius * 1.08}, ${bgCenter.x + bgRadius * 0.88} ${bgCenter.y - bgRadius * 0.48}
           `} />
 
           {/* Left wing bracket - inner contour */}
           <path d={`
-            M ${bgCenter.x - bgRadius * 1.255} ${bgCenter.y - bgRadius * 0.27}
-            L ${bgCenter.x - bgRadius * 1.43} ${bgCenter.y}
-            L ${bgCenter.x - bgRadius * 1.255} ${bgCenter.y + bgRadius * 0.27}
+            M ${bgCenter.x - bgRadius * 1.28} ${bgCenter.y - bgRadius * 0.29}
+            L ${bgCenter.x - bgRadius * 1.48} ${bgCenter.y}
+            L ${bgCenter.x - bgRadius * 1.28} ${bgCenter.y + bgRadius * 0.29}
           `} />
 
           {/* Right wing bracket - inner contour */}
           <path d={`
-            M ${bgCenter.x + bgRadius * 1.255} ${bgCenter.y - bgRadius * 0.27}
-            L ${bgCenter.x + bgRadius * 1.43} ${bgCenter.y}
-            L ${bgCenter.x + bgRadius * 1.255} ${bgCenter.y + bgRadius * 0.27}
+            M ${bgCenter.x + bgRadius * 1.28} ${bgCenter.y - bgRadius * 0.29}
+            L ${bgCenter.x + bgRadius * 1.48} ${bgCenter.y}
+            L ${bgCenter.x + bgRadius * 1.28} ${bgCenter.y + bgRadius * 0.29}
           `} />
 
           {/* Bottom decorative chevron - inner contour */}
           <path d={`
-            M ${bgCenter.x - bgRadius * 0.76} ${bgCenter.y + bgRadius * 1.1}
-            L ${bgCenter.x - bgRadius * 0.285} ${bgCenter.y + bgRadius * 1.19}
-            L ${bgCenter.x} ${bgCenter.y + bgRadius * 1.235}
-            L ${bgCenter.x + bgRadius * 0.285} ${bgCenter.y + bgRadius * 1.19}
-            L ${bgCenter.x + bgRadius * 0.76} ${bgCenter.y + bgRadius * 1.1}
+            M ${bgCenter.x - bgRadius * 0.78} ${bgCenter.y + bgRadius * 1.13}
+            L ${bgCenter.x - bgRadius * 0.29} ${bgCenter.y + bgRadius * 1.23}
+            L ${bgCenter.x} ${bgCenter.y + bgRadius * 1.28}
+            L ${bgCenter.x + bgRadius * 0.29} ${bgCenter.y + bgRadius * 1.23}
+            L ${bgCenter.x + bgRadius * 0.78} ${bgCenter.y + bgRadius * 1.13}
           `} />
+        </g>
+
+        {/* Layer 2: Corner Accents - Art Deco meets sci-fi brackets in viewport corners */}
+        <g stroke={COLORS.goldPrimary} fill="none" opacity={1}>
+          {/* Top-left corner accent */}
+          <g>
+            {/* Main bracket structure - thick */}
+            <path
+              d={`
+                M ${viewportSize.width * 0.02} ${viewportSize.height * 0.15}
+                L ${viewportSize.width * 0.02} ${viewportSize.height * 0.05}
+                L ${viewportSize.width * 0.05} ${viewportSize.height * 0.02}
+                L ${viewportSize.width * 0.15} ${viewportSize.height * 0.02}
+              `}
+              strokeWidth={4}
+            />
+            {/* Inner parallel line - thin, closer to thick line */}
+            <path
+              d={`
+                M ${viewportSize.width * 0.028} ${viewportSize.height * 0.14}
+                L ${viewportSize.width * 0.028} ${viewportSize.height * 0.055}
+                L ${viewportSize.width * 0.055} ${viewportSize.height * 0.028}
+                L ${viewportSize.width * 0.14} ${viewportSize.height * 0.028}
+              `}
+              strokeWidth={1}
+              opacity={0.8}
+            />
+            {/* Diagonal accent line pointing toward center */}
+            <line
+              x1={viewportSize.width * 0.06}
+              y1={viewportSize.height * 0.06}
+              x2={viewportSize.width * 0.12}
+              y2={viewportSize.height * 0.12}
+              strokeWidth={1}
+              opacity={0.6}
+            />
+            {/* Small accent dots */}
+            <circle cx={viewportSize.width * 0.02} cy={viewportSize.height * 0.05} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+            <circle cx={viewportSize.width * 0.05} cy={viewportSize.height * 0.02} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+          </g>
+
+          {/* Top-right corner accent (mirrored) */}
+          <g>
+            <path
+              d={`
+                M ${viewportSize.width * 0.98} ${viewportSize.height * 0.15}
+                L ${viewportSize.width * 0.98} ${viewportSize.height * 0.05}
+                L ${viewportSize.width * 0.95} ${viewportSize.height * 0.02}
+                L ${viewportSize.width * 0.85} ${viewportSize.height * 0.02}
+              `}
+              strokeWidth={4}
+            />
+            <path
+              d={`
+                M ${viewportSize.width * 0.972} ${viewportSize.height * 0.14}
+                L ${viewportSize.width * 0.972} ${viewportSize.height * 0.055}
+                L ${viewportSize.width * 0.945} ${viewportSize.height * 0.028}
+                L ${viewportSize.width * 0.86} ${viewportSize.height * 0.028}
+              `}
+              strokeWidth={1}
+              opacity={0.8}
+            />
+            <line
+              x1={viewportSize.width * 0.94}
+              y1={viewportSize.height * 0.06}
+              x2={viewportSize.width * 0.88}
+              y2={viewportSize.height * 0.12}
+              strokeWidth={1}
+              opacity={0.6}
+            />
+            <circle cx={viewportSize.width * 0.98} cy={viewportSize.height * 0.05} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+            <circle cx={viewportSize.width * 0.95} cy={viewportSize.height * 0.02} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+          </g>
+
+          {/* Bottom-left corner accent */}
+          <g>
+            <path
+              d={`
+                M ${viewportSize.width * 0.02} ${viewportSize.height * 0.85}
+                L ${viewportSize.width * 0.02} ${viewportSize.height * 0.95}
+                L ${viewportSize.width * 0.05} ${viewportSize.height * 0.98}
+                L ${viewportSize.width * 0.15} ${viewportSize.height * 0.98}
+              `}
+              strokeWidth={4}
+            />
+            <path
+              d={`
+                M ${viewportSize.width * 0.028} ${viewportSize.height * 0.86}
+                L ${viewportSize.width * 0.028} ${viewportSize.height * 0.945}
+                L ${viewportSize.width * 0.055} ${viewportSize.height * 0.972}
+                L ${viewportSize.width * 0.14} ${viewportSize.height * 0.972}
+              `}
+              strokeWidth={1}
+              opacity={0.8}
+            />
+            <line
+              x1={viewportSize.width * 0.06}
+              y1={viewportSize.height * 0.94}
+              x2={viewportSize.width * 0.12}
+              y2={viewportSize.height * 0.88}
+              strokeWidth={1}
+              opacity={0.6}
+            />
+            <circle cx={viewportSize.width * 0.02} cy={viewportSize.height * 0.95} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+            <circle cx={viewportSize.width * 0.05} cy={viewportSize.height * 0.98} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+          </g>
+
+          {/* Bottom-right corner accent (mirrored) */}
+          <g>
+            <path
+              d={`
+                M ${viewportSize.width * 0.98} ${viewportSize.height * 0.85}
+                L ${viewportSize.width * 0.98} ${viewportSize.height * 0.95}
+                L ${viewportSize.width * 0.95} ${viewportSize.height * 0.98}
+                L ${viewportSize.width * 0.85} ${viewportSize.height * 0.98}
+              `}
+              strokeWidth={4}
+            />
+            <path
+              d={`
+                M ${viewportSize.width * 0.972} ${viewportSize.height * 0.86}
+                L ${viewportSize.width * 0.972} ${viewportSize.height * 0.945}
+                L ${viewportSize.width * 0.945} ${viewportSize.height * 0.972}
+                L ${viewportSize.width * 0.86} ${viewportSize.height * 0.972}
+              `}
+              strokeWidth={1}
+              opacity={0.8}
+            />
+            <line
+              x1={viewportSize.width * 0.94}
+              y1={viewportSize.height * 0.94}
+              x2={viewportSize.width * 0.88}
+              y2={viewportSize.height * 0.88}
+              strokeWidth={1}
+              opacity={0.6}
+            />
+            <circle cx={viewportSize.width * 0.98} cy={viewportSize.height * 0.95} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+            <circle cx={viewportSize.width * 0.95} cy={viewportSize.height * 0.98} r={3} fill={COLORS.goldPrimary} stroke="none" opacity={1} />
+          </g>
+        </g>
+
+        {/* Layer 3: Orokin Glyphs - Abstract Tenno-inspired symbols scattered around frame */}
+        <g stroke={COLORS.goldPrimary} fill="none" opacity={0.225}>
+          {/* Glyph definitions - abstract geometric symbols inspired by Warframe aesthetics */}
+          {/* Glyph 1: Top-left area - Diamond with internal cross */}
+          <g transform={`translate(${bgCenter.x - bgRadius * 1.4}, ${bgCenter.y - bgRadius * 0.8}) rotate(-15)`}>
+            <path d="M 0 -12 L 12 0 L 0 12 L -12 0 Z" strokeWidth={1.5} />
+            <line x1="0" y1="-6" x2="0" y2="6" strokeWidth={1} />
+            <line x1="-6" y1="0" x2="6" y2="0" strokeWidth={1} />
+          </g>
+
+          {/* Glyph 2: Top-right area - Triangle with dot */}
+          <g transform={`translate(${bgCenter.x + bgRadius * 1.35}, ${bgCenter.y - bgRadius * 0.9}) rotate(20)`}>
+            <path d="M 0 -10 L 10 8 L -10 8 Z" strokeWidth={1.5} />
+            <circle cx="0" cy="2" r="2" fill={COLORS.goldPrimary} stroke="none" />
+          </g>
+
+          {/* Glyph 3: Left side - Concentric arcs (Void portal style) */}
+          <g transform={`translate(${bgCenter.x - bgRadius * 1.6}, ${bgCenter.y + bgRadius * 0.3}) rotate(-5)`}>
+            <path d="M -8 0 A 8 8 0 0 1 8 0" strokeWidth={1} />
+            <path d="M -12 0 A 12 12 0 0 1 12 0" strokeWidth={1} opacity={0.7} />
+            <circle cx="0" cy="0" r="2" fill={COLORS.goldPrimary} stroke="none" />
+          </g>
+
+          {/* Glyph 4: Right side - Hexagonal shape */}
+          <g transform={`translate(${bgCenter.x + bgRadius * 1.55}, ${bgCenter.y + bgRadius * 0.2}) rotate(10)`}>
+            <path d="M 0 -10 L 9 -5 L 9 5 L 0 10 L -9 5 L -9 -5 Z" strokeWidth={1.5} />
+            <path d="M 0 -5 L 4.5 -2.5 L 4.5 2.5 L 0 5 L -4.5 2.5 L -4.5 -2.5 Z" strokeWidth={1} opacity={0.6} />
+          </g>
+
+          {/* Glyph 5: Bottom-left - Crescent with star point */}
+          <g transform={`translate(${bgCenter.x - bgRadius * 1.2}, ${bgCenter.y + bgRadius * 1.0}) rotate(25)`}>
+            <path d="M -8 -6 A 10 10 0 0 0 -8 6" strokeWidth={1.5} />
+            <path d="M -4 0 L 8 0 M 4 -4 L 4 4" strokeWidth={1} />
+          </g>
+
+          {/* Glyph 6: Bottom-right - Eye symbol (Tenno vision) */}
+          <g transform={`translate(${bgCenter.x + bgRadius * 1.25}, ${bgCenter.y + bgRadius * 0.95}) rotate(-20)`}>
+            <ellipse cx="0" cy="0" rx="12" ry="6" strokeWidth={1.5} />
+            <circle cx="0" cy="0" r="3" fill={COLORS.goldPrimary} stroke="none" />
+            <line x1="-15" y1="0" x2="-12" y2="0" strokeWidth={1} />
+            <line x1="12" y1="0" x2="15" y2="0" strokeWidth={1} />
+          </g>
+
+          {/* Glyph 7: Top area - Arrow/chevron pointing down */}
+          <g transform={`translate(${bgCenter.x + bgRadius * 0.5}, ${bgCenter.y - bgRadius * 1.5}) rotate(5)`}>
+            <path d="M -8 -4 L 0 6 L 8 -4" strokeWidth={1.5} fill="none" />
+            <path d="M -5 -6 L 0 0 L 5 -6" strokeWidth={1} opacity={0.6} />
+          </g>
+
+          {/* Glyph 8: Left-top area - Spiral fragment */}
+          <g transform={`translate(${bgCenter.x - bgRadius * 0.6}, ${bgCenter.y - bgRadius * 1.45}) rotate(-10)`}>
+            <path d="M 0 0 Q 6 -3 8 -8 Q 10 -14 4 -16" strokeWidth={1.5} fill="none" />
+            <circle cx="0" cy="0" r="2" fill={COLORS.goldPrimary} stroke="none" />
+          </g>
+
+          {/* Glyph 9: Bottom center-left - Cross with angled ends */}
+          <g transform={`translate(${bgCenter.x - bgRadius * 0.4}, ${bgCenter.y + bgRadius * 1.35}) rotate(0)`}>
+            <line x1="0" y1="-10" x2="0" y2="10" strokeWidth={1.5} />
+            <line x1="-10" y1="0" x2="10" y2="0" strokeWidth={1.5} />
+            <line x1="-3" y1="-10" x2="3" y2="-10" strokeWidth={1} />
+            <line x1="-3" y1="10" x2="3" y2="10" strokeWidth={1} />
+          </g>
+
+          {/* Glyph 10: Bottom center-right - Interlocked triangles */}
+          <g transform={`translate(${bgCenter.x + bgRadius * 0.45}, ${bgCenter.y + bgRadius * 1.4}) rotate(15)`}>
+            <path d="M 0 -8 L 7 4 L -7 4 Z" strokeWidth={1.5} />
+            <path d="M 0 8 L -7 -4 L 7 -4 Z" strokeWidth={1} opacity={0.5} />
+          </g>
+
+          {/* Additional smaller glyphs for organic scatter effect */}
+          {/* Small dot clusters */}
+          <g opacity={0.4}>
+            <circle cx={bgCenter.x - bgRadius * 1.5} cy={bgCenter.y - bgRadius * 0.4} r={2} fill={COLORS.goldPrimary} stroke="none" />
+            <circle cx={bgCenter.x - bgRadius * 1.48} cy={bgCenter.y - bgRadius * 0.35} r={1.5} fill={COLORS.goldPrimary} stroke="none" />
+            <circle cx={bgCenter.x - bgRadius * 1.52} cy={bgCenter.y - bgRadius * 0.32} r={1} fill={COLORS.goldPrimary} stroke="none" />
+
+            <circle cx={bgCenter.x + bgRadius * 1.45} cy={bgCenter.y - bgRadius * 0.5} r={2} fill={COLORS.goldPrimary} stroke="none" />
+            <circle cx={bgCenter.x + bgRadius * 1.42} cy={bgCenter.y - bgRadius * 0.55} r={1.5} fill={COLORS.goldPrimary} stroke="none" />
+
+            <circle cx={bgCenter.x - bgRadius * 0.9} cy={bgCenter.y + bgRadius * 1.25} r={2} fill={COLORS.goldPrimary} stroke="none" />
+            <circle cx={bgCenter.x + bgRadius * 0.85} cy={bgCenter.y + bgRadius * 1.3} r={1.5} fill={COLORS.goldPrimary} stroke="none" />
+          </g>
         </g>
       </svg>
       )}
