@@ -48,6 +48,34 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // GLB 3D model files - set proper MIME type and caching
+        source: '/:path*.glb',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'model/gltf-binary',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // GLTF 3D model files
+        source: '/:path*.gltf',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'model/gltf+json',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
   },
 };
