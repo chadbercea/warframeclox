@@ -105,7 +105,11 @@ export async function GET() {
   }
 
   // Fallback to official Warframe API
-  const WARFRAME_API_URLS = ['https://api.warframe.com/cdn/worldState.php'];
+  // Try multiple approaches - direct and via CORS proxy
+  const WARFRAME_API_URLS = [
+    'https://api.warframe.com/cdn/worldState.php',
+    'https://corsproxy.io/?https://api.warframe.com/cdn/worldState.php',
+  ];
 
   for (const apiUrl of WARFRAME_API_URLS) {
     try {
