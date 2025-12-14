@@ -60,6 +60,7 @@ function validateWorldStateResponse(data: WorldStateResponse): { cycleStart: num
 
 export async function GET() {
   const startTime = Date.now();
+  const errors: string[] = [];
 
   // Try warframestat.us community API first (CORS-friendly, designed for apps)
   try {
@@ -92,10 +93,12 @@ export async function GET() {
           responseTime,
         });
       }
-      console.error('warframestat.us returned invalid data:', data);
+      errors.push(`warframestat: invalid data - ${JSON.stringify(data).slice(0, 100)}`);
+    } else {
+      errors.push(`warframestat: HTTP ${response.status}`);
     }
   } catch (error) {
-    console.error('warframestat.us failed:', error);
+    errors.push(`warframestat: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 
   // Fallback to official Warframe API
@@ -124,7 +127,7 @@ export async function GET() {
       const responseTime = Date.now() - apiStartTime;
 
       if (!response.ok) {
-        console.error(`API ${apiUrl} returned:`, response.status);
+        errors.push(`warframe-api: HTTP ${response.status}`);
         continue;
       }
 
@@ -147,9 +150,9 @@ export async function GET() {
           responseTime,
         });
       }
-      console.error(`${apiUrl} returned invalid data structure`);
+      errors.push(`warframe-api: no CetusSyndicate in response`);
     } catch (error) {
-      console.error(`Failed to fetch from ${apiUrl}:`, error);
+      errors.push(`warframe-api: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
   }
 
@@ -177,5 +180,6 @@ export async function GET() {
     isDay,
     fetchedAt: Date.now(),
     source: 'calculated',
+    _debug: errors.length > 0 ? errors : undefined,
   });
 }
