@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 
-// Log immediately when this module loads
-console.log('[EarthGlobe] Module loaded');
+// Log immediately when this module loads - v2
+console.log('[EarthGlobe] Module loaded - BUILD v2');
 
 type LoadState = 'loading' | 'success' | 'error';
 
