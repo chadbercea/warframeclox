@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 
 const GLOBE_RADIUS = 100;
+const MODEL_SCALE = 2; // 2x larger as requested
 
 export default function EarthGlobeInner() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,9 +56,12 @@ export default function EarthGlobeInner() {
       animationId: null,
     };
 
-    // Earth group positioned at bottom half of viewport
+    // Earth group positioned at bottom - scaled radius accounts for 2x size
+    // Position so top of globe is at bottom 20% of viewport
     const earthGroup = new THREE.Group();
-    earthGroup.position.set(0, -GLOBE_RADIUS, 0);
+    const scaledRadius = GLOBE_RADIUS * MODEL_SCALE;
+    // Push down so only top portion is visible, top at ~20% from bottom
+    earthGroup.position.set(0, -scaledRadius * 1.3, 0);
     scene.add(earthGroup);
 
     const earthMaterials: THREE.MeshStandardMaterial[] = [];
@@ -77,6 +81,7 @@ export default function EarthGlobeInner() {
           }
         });
 
+        earth.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
         earthGroup.add(earth);
         console.log('[Earth] Model loaded');
       },
@@ -169,7 +174,8 @@ export default function EarthGlobeInner() {
       ref={containerRef}
       className="fixed bottom-0 left-0 right-0 pointer-events-none"
       style={{
-        height: '50vh',
+        width: '100%',
+        height: '100vh',
         zIndex: 0,
       }}
     />
