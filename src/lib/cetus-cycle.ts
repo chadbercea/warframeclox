@@ -79,7 +79,7 @@ export function getCetusCycleState(now: Date = new Date()): CetusCycleState {
   // Fallback: Use calculation based on known cycle pattern
   // The cycle repeats every 150 minutes from a known reference
   // Using verified cycle start from Dec 13, 2025 API response
-  const FALLBACK_EPOCH = 1765616932673;
+  const FALLBACK_EPOCH = 1765688923671;
   const timeSinceEpoch = currentTime - FALLBACK_EPOCH;
   const positionInCycle = ((timeSinceEpoch % CETUS_CYCLE_DURATION) + CETUS_CYCLE_DURATION) % CETUS_CYCLE_DURATION;
 

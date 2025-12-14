@@ -105,9 +105,10 @@ export async function GET() {
   }
 
   // Fallback to official Warframe API (DE's public API)
-  // content.warframe.com works from Vercel (api.warframe.com blocks cloud IPs)
+  // Note: api.warframe.com blocks cloud provider IPs (Vercel, AWS, GCP, etc.)
+  // This will only work from local development or non-cloud hosting
   const WARFRAME_API_URLS = [
-    'https://content.warframe.com/dynamic/worldState.php',
+    'https://api.warframe.com/cdn/worldState.php',
   ];
 
   for (const apiUrl of WARFRAME_API_URLS) {
@@ -162,7 +163,7 @@ export async function GET() {
   const CETUS_DAY_MS = 100 * 60 * 1000;
   const CETUS_CYCLE_MS = 150 * 60 * 1000;
   // Reference: Verified cycle start from Dec 13, 2025 API response
-  const KNOWN_CYCLE_START = 1765616932673;
+  const KNOWN_CYCLE_START = 1765688923671;
 
   const now = Date.now();
   const timeSinceKnown = now - KNOWN_CYCLE_START;
