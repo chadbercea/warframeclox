@@ -104,11 +104,10 @@ export async function GET() {
     errors.push(`warframestat: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 
-  // Fallback to official Warframe API
-  // Try multiple approaches - direct and via CORS proxy
+  // Fallback to official Warframe API (DE's public API)
+  // Use the exact URL with trailing ? as per DE's redirect
   const WARFRAME_API_URLS = [
-    'https://api.warframe.com/cdn/worldState.php',
-    'https://corsproxy.io/?https://api.warframe.com/cdn/worldState.php',
+    'https://api.warframe.com/cdn/worldState.php?',
   ];
 
   for (const apiUrl of WARFRAME_API_URLS) {
