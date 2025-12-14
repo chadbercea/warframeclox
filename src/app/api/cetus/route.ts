@@ -1,7 +1,7 @@
 // Server-side API route for Cetus cycle data
 // Priority: warframestat.us → official Warframe API → calculated fallback
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Response types for external APIs
