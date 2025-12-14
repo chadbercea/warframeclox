@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export type ApiStatus = 'connected' | 'disconnected' | 'checking';
-export type DataSource = 'warframestat' | 'warframe-api' | 'calculated' | null;
+export type DataSource = 'edge-config' | 'warframestat' | 'warframe-api' | 'calculated' | null;
 
 export interface UseApiStatusReturn {
   status: ApiStatus;

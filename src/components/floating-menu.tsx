@@ -467,6 +467,7 @@ export function FloatingMenu() {
                             color: COLORS.goldPrimary,
                           }}
                         >
+                          {apiSource === 'edge-config' && 'synced via GitHub'}
                           {apiSource === 'warframestat' && 'via warframestat.us'}
                           {apiSource === 'warframe-api' && 'via Warframe API'}
                           {apiSource === 'calculated' && 'using local calc'}

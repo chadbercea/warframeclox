@@ -1,0 +1,68 @@
+name: Sync Cetus Cycle Timestamp
+
+on:
+  schedule:
+    # Run every 6 hours to keep timestamp fresh
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync-timestamp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Cetus cycle from Warframe API
+        id: fetch
+        run: |
+          # Fetch worldState from Warframe API
+          RESPONSE=$(curl -s --max-time 30 \
+            -H "Accept: application/json" \
+            "https://api.warframe.com/cdn/worldState.php")
+
+          # Extract CetusSyndicate data using jq
+          CETUS_DATA=$(echo "$RESPONSE" | jq -r '.SyndicateMissions[] | select(.Tag == "CetusSyndicate")')
+
+          if [ -z "$CETUS_DATA" ]; then
+            echo "Failed to find CetusSyndicate in response"
+            exit 1
+          fi
+
+          # Extract timestamps
+          CYCLE_START=$(echo "$CETUS_DATA" | jq -r '.Activation."$date"."$numberLong"')
+          CYCLE_END=$(echo "$CETUS_DATA" | jq -r '.Expiry."$date"."$numberLong"')
+
+          echo "cycle_start=$CYCLE_START" >> $GITHUB_OUTPUT
+          echo "cycle_end=$CYCLE_END" >> $GITHUB_OUTPUT
+          echo "fetched_at=$(date +%s)000" >> $GITHUB_OUTPUT
+
+          echo "Fetched Cetus cycle: start=$CYCLE_START, end=$CYCLE_END"
+
+      - name: Update Vercel Edge Config
+        env:
+          VERCEL_ACCESS_TOKEN: ${{ secrets.VERCEL_ACCESS_TOKEN }}
+          EDGE_CONFIG_ID: ${{ secrets.EDGE_CONFIG_ID }}
+        run: |
+          # Update Edge Config with new timestamp
+          curl -X PATCH "https://api.vercel.com/v1/edge-config/$EDGE_CONFIG_ID/items" \
+            -H "Authorization: Bearer $VERCEL_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "items": [
+                {
+                  "operation": "upsert",
+                  "key": "cetus_cycle_start",
+                  "value": ${{ steps.fetch.outputs.cycle_start }}
+                },
+                {
+                  "operation": "upsert",
+                  "key": "cetus_cycle_end",
+                  "value": ${{ steps.fetch.outputs.cycle_end }}
+                },
+                {
+                  "operation": "upsert",
+                  "key": "cetus_synced_at",
+                  "value": ${{ steps.fetch.outputs.fetched_at }}
+                }
+              ]
+            }'
+
+          echo "Updated Vercel Edge Config with new Cetus cycle data"
