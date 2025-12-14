@@ -8,6 +8,12 @@ import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 const GLOBE_RADIUS = 100;
 const MODEL_SCALE = 2; // 2x larger as requested
 
+// Use GitHub raw URL as fallback for Vercel deployment issue
+// See: https://github.com/chadbercea/warframeclox/issues/ILI-295
+const EARTH_MODEL_URL = process.env.NODE_ENV === 'production'
+  ? 'https://raw.githubusercontent.com/chadbercea/warframeclox/main/public/models/earth.glb'
+  : '/models/earth.glb';
+
 export default function EarthGlobeInner() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
@@ -69,7 +75,7 @@ export default function EarthGlobeInner() {
     // Load model
     const loader = new GLTFLoader();
     loader.load(
-      '/models/earth.glb',
+      EARTH_MODEL_URL,
       (gltf) => {
         if (!sceneRef.current) return;
 
