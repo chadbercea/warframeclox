@@ -21,6 +21,24 @@ A fast, accurate, offline-capable PWA that shows exactly when night begins—wit
 
 ## How It Works
 
+### Data Sync Architecture
+
+The Warframe API blocks requests from cloud provider IPs (Vercel, AWS, GitHub Actions, etc.). To solve this, the app uses a **cascading data source strategy**:
+
+| Priority | Source | Description |
+|----------|--------|-------------|
+| 1 | **Direct API** | User's browser fetches directly from `content.warframe.com` (residential IPs aren't blocked) |
+| 2 | **Edge Config** | Vercel Edge Config with pre-seeded reference timestamp |
+| 3 | **LocalStorage** | Cached timestamp from a previous successful browser fetch |
+| 4 | **Calculated** | Hardcoded reference timestamp as last resort |
+
+This means:
+- **Most users** get real-time data directly from Warframe via their browser
+- **Corporate/VPN users** fall back to Edge Config or cached data
+- **Offline users** still get accurate timing from localStorage or calculation
+
+The cycle is deterministic (150 min total), so once synced, timing stays accurate indefinitely.
+
 ### Cycle Calculation
 
 The app fetches cycle data from Digital Extremes' official World State API:
@@ -33,7 +51,7 @@ The `SyndicateMissions` array contains a `CetusSyndicate` entry with `Activation
 
 ### Offline Support
 
-The service worker caches the app shell and uses a stale-while-revalidate strategy—serve cached content immediately, fetch fresh data in the background. If the API is unreachable, the app falls back to calculation from a known epoch.
+The service worker caches the app shell and uses a stale-while-revalidate strategy—serve cached content immediately, fetch fresh data in the background. If the API is unreachable, the app falls back to localStorage or calculation from a known epoch.
 
 ### Notifications
 
@@ -58,10 +76,14 @@ Response fields:
 - `isDay` - Boolean indicating day/night
 - `fetchedAt` - When the response was generated
 - `source` - Which data source provided the cycle data:
+  - `direct-api` - User's browser fetched directly from Warframe API
+  - `edge-config` - Vercel Edge Config (pre-seeded reference)
   - `warframestat` - warframestat.us community API
-  - `warframe-api` - Official Warframe API
+  - `warframe-api` - Official Warframe API (server-side)
+  - `localStorage` - Cached from previous browser fetch
   - `calculated` - Local fallback calculation
 - `responseTime` - API response time in ms (not present for calculated)
+- `syncedAt` - When Edge Config was last synced (only for edge-config source)
 
 ## Development
 
