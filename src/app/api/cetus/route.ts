@@ -1,7 +1,7 @@
 // Server-side API route for Cetus cycle data
 // Priority: warframestat.us → official Warframe API → calculated fallback
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 // Response types for external APIs
@@ -99,8 +99,8 @@ export async function GET() {
   }
 
   // Fallback to official Warframe API
+  // Note: content.warframe.com redirects to api.warframe.com, so use direct URL
   const WARFRAME_API_URLS = [
-    'https://content.warframe.com/dynamic/worldState.php',
     'https://api.warframe.com/cdn/worldState.php',
   ];
 
@@ -108,7 +108,7 @@ export async function GET() {
     try {
       const apiStartTime = Date.now();
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout for serverless
 
       const response = await fetch(apiUrl, {
         cache: 'no-store',
