@@ -1,0 +1,20 @@
+# Handle line endings automatically for files detected as text
+* text=auto
+
+# Treat 3D model files as binary to prevent line-ending conversion
+*.glb binary
+*.gltf binary
+*.bin binary
+
+# Other binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.avif binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
