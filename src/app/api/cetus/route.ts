@@ -105,9 +105,11 @@ export async function GET() {
   }
 
   // Fallback to official Warframe API (DE's public API)
-  // Use the exact URL with trailing ? as per DE's redirect
+  // Try multiple endpoints - PC, mobile, and console APIs
   const WARFRAME_API_URLS = [
     'https://api.warframe.com/cdn/worldState.php?',
+    'https://api-mob.warframe.com/cdn/worldState.php',
+    'https://api-ps4.warframe.com/cdn/worldState.php',
   ];
 
   for (const apiUrl of WARFRAME_API_URLS) {
