@@ -105,11 +105,9 @@ export async function GET() {
   }
 
   // Fallback to official Warframe API (DE's public API)
-  // Try multiple endpoints - PC, mobile, and console APIs
+  // content.warframe.com works from Vercel (api.warframe.com blocks cloud IPs)
   const WARFRAME_API_URLS = [
-    'https://api.warframe.com/cdn/worldState.php?',
-    'https://api-mob.warframe.com/cdn/worldState.php',
-    'https://api-ps4.warframe.com/cdn/worldState.php',
+    'https://content.warframe.com/dynamic/worldState.php',
   ];
 
   for (const apiUrl of WARFRAME_API_URLS) {
@@ -121,13 +119,8 @@ export async function GET() {
       const response = await fetch(apiUrl, {
         cache: 'no-store',
         signal: controller.signal,
-        redirect: 'follow',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://warframe.com/',
-          'Origin': 'https://warframe.com',
+          'Accept': 'application/json',
         },
       });
 
