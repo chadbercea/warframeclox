@@ -3,6 +3,8 @@
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Try different regions - some may not be blocked
+export const preferredRegion = ['iad1', 'sfo1', 'hnd1'];
 
 // Response types for external APIs
 interface WarframeStatCetusResponse {
@@ -101,12 +103,8 @@ export async function GET() {
     errors.push(`warframestat: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 
-  // Fallback to official Warframe API via Vercel rewrite proxy
-  // The proxy is configured in next.config.mjs to bypass IP blocking
-  const vercelUrl = process.env.VERCEL_URL;
-  const WARFRAME_API_URLS = vercelUrl
-    ? [`https://${vercelUrl}/proxy/warframe/worldState.php`] // Use proxy on Vercel
-    : ['https://api.warframe.com/cdn/worldState.php']; // Direct on local
+  // Fallback to official Warframe API
+  const WARFRAME_API_URLS = ['https://api.warframe.com/cdn/worldState.php'];
 
   for (const apiUrl of WARFRAME_API_URLS) {
     try {
