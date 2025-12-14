@@ -73,8 +73,9 @@ export async function GET() {
       cache: 'no-store',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'WarframeClox/1.0 (Cetus Cycle Tracker)',
-        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
     });
 
@@ -117,8 +118,11 @@ export async function GET() {
         signal: controller.signal,
         redirect: 'follow',
         headers: {
-          'User-Agent': 'WarframeClox/1.0 (Cetus Cycle Tracker)',
-          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://warframe.com/',
+          'Origin': 'https://warframe.com',
         },
       });
 
