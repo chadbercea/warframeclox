@@ -101,11 +101,12 @@ export async function GET() {
     errors.push(`warframestat: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 
-  // Fallback to official Warframe API
-  // Note: content.warframe.com redirects to api.warframe.com, so use direct URL
-  const WARFRAME_API_URLS = [
-    'https://api.warframe.com/cdn/worldState.php',
-  ];
+  // Fallback to official Warframe API via Vercel rewrite proxy
+  // The proxy is configured in next.config.mjs to bypass IP blocking
+  const vercelUrl = process.env.VERCEL_URL;
+  const WARFRAME_API_URLS = vercelUrl
+    ? [`https://${vercelUrl}/proxy/warframe/worldState.php`] // Use proxy on Vercel
+    : ['https://api.warframe.com/cdn/worldState.php']; // Direct on local
 
   for (const apiUrl of WARFRAME_API_URLS) {
     try {
