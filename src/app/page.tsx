@@ -8,14 +8,14 @@ import { ScrollLock } from '@/components/scroll-lock';
 
 export default function Home() {
   return (
-    <main className="h-full w-full flex flex-col relative overflow-hidden" style={{ backgroundColor: '#000000' }}>
+    <main className="fixed inset-0 flex flex-col overflow-hidden" style={{ backgroundColor: '#000000', touchAction: 'none' }}>
       <ScrollLock />
       <SpaceBackground />
       <EarthGlobe />
       <FloatingMenu />
       {/* <AssetDebugger /> */}
 
-      <div className="flex-1 flex flex-col items-center justify-center relative z-10">
+      <div className="fixed inset-0 flex flex-col items-center justify-center z-10">
         <CetusClock />
         <Footer />
       </div>
