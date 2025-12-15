@@ -68,17 +68,17 @@ jobs:
               "items": [
                 {
                   "operation": "upsert",
-                  "key": "cetus_cycle_start",
+                  "key": "cetus_start",
                   "value": ${{ steps.fetch.outputs.cycle_start }}
                 },
                 {
                   "operation": "upsert",
-                  "key": "cetus_cycle_end",
+                  "key": "cetus_end",
                   "value": ${{ steps.fetch.outputs.cycle_end }}
                 },
                 {
                   "operation": "upsert",
-                  "key": "cetus_synced_at",
+                  "key": "synced_at",
                   "value": ${{ steps.fetch.outputs.fetched_at }}
                 }
               ]
