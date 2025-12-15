@@ -1,95 +1,89 @@
 import { NextRequest } from 'next/server';
+import { get } from '@vercel/edge-config';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-// Vercel Cron - runs every 6 hours
-// Configure in vercel.json: { "crons": [{ "path": "/api/sync-cetus", "schedule": "0 */6 * * *" }] }
-
 const EDGE_CONFIG_ID = 'ecfg_i7wukxkcxmejcih7vtkpfcthms6b';
 
-interface CetusSyndicate {
-  Tag: string;
-  Activation: { $date: { $numberLong: string } };
-  Expiry: { $date: { $numberLong: string } };
+// Minimum time between updates (5 minutes) - prevents spam
+const MIN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
+
+// Validate timestamp is reasonable (not too old, not in the future)
+function isValidTimestamp(ts: number): boolean {
+  const now = Date.now();
+  const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
+  const oneHourAhead = now + 60 * 60 * 1000;
+  return ts > oneYearAgo && ts < oneHourAhead;
 }
 
-interface WorldState {
-  SyndicateMissions?: CetusSyndicate[];
-}
-
-export async function GET(request: NextRequest) {
-  // Verify cron secret or allow manual trigger for testing
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const isAuthorized = isVercelCron || (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  
-  // Allow unauthenticated for testing, but log it
-  const isTest = request.nextUrl.searchParams.get('test') === '1';
-  
-  if (!isAuthorized && !isTest) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const results: string[] = [];
-  
-  // Try fetching from Warframe API
+// POST: Accept sync data from client browsers (residential IPs)
+export async function POST(request: NextRequest) {
   try {
-    results.push('Attempting Warframe API fetch...');
-    
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    
-    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'WarframeClox/1.0',
-      },
-    });
-    clearTimeout(timeout);
-    
-    if (!response.ok) {
-      results.push(`Warframe API returned ${response.status}`);
+    const body = await request.json();
+    const { activation, expiry } = body;
+
+    // Validate required fields
+    if (!activation || !expiry) {
       return Response.json({ 
         success: false, 
-        error: `API returned ${response.status}`,
-        logs: results 
-      });
+        error: 'Missing activation or expiry' 
+      }, { status: 400 });
     }
-    
-    const data: WorldState = await response.json();
-    results.push('Warframe API response received');
-    
-    const cetusMission = data.SyndicateMissions?.find(m => m.Tag === 'CetusSyndicate');
-    
-    if (!cetusMission) {
-      results.push('CetusSyndicate not found in response');
+
+    const activationTs = typeof activation === 'string' ? parseInt(activation) : activation;
+    const expiryTs = typeof expiry === 'string' ? parseInt(expiry) : expiry;
+
+    // Validate timestamps are reasonable
+    if (!isValidTimestamp(activationTs) || !isValidTimestamp(expiryTs)) {
       return Response.json({ 
         success: false, 
-        error: 'CetusSyndicate not found',
-        logs: results 
+        error: 'Invalid timestamp range' 
+      }, { status: 400 });
+    }
+
+    // Validate cycle duration (should be ~150 minutes / 9000000ms)
+    const cycleDuration = expiryTs - activationTs;
+    if (cycleDuration < 8000000 || cycleDuration > 10000000) {
+      return Response.json({ 
+        success: false, 
+        error: 'Invalid cycle duration' 
+      }, { status: 400 });
+    }
+
+    // Check current stored data
+    const currentSyncedAt = await get<number>('synced_at');
+    const currentStart = await get<number>('cetus_start');
+    const now = Date.now();
+
+    // Skip if we synced recently (within MIN_UPDATE_INTERVAL_MS)
+    if (currentSyncedAt && (now - currentSyncedAt) < MIN_UPDATE_INTERVAL_MS) {
+      return Response.json({ 
+        success: true, 
+        action: 'skipped',
+        reason: 'Recently synced',
+        lastSync: currentSyncedAt
       });
     }
-    
-    const activation = cetusMission.Activation.$date.$numberLong;
-    const expiry = cetusMission.Expiry.$date.$numberLong;
-    const syncedAt = Date.now();
-    
-    results.push(`Cetus data: activation=${activation}, expiry=${expiry}`);
-    
-    // Update Edge Config
+
+    // Skip if data is the same (same activation timestamp)
+    if (currentStart === activationTs) {
+      return Response.json({ 
+        success: true, 
+        action: 'skipped',
+        reason: 'Data unchanged'
+      });
+    }
+
+    // Update Edge Config with new data
     const vercelToken = process.env.VERCEL_ACCESS_TOKEN;
     if (!vercelToken) {
-      results.push('VERCEL_ACCESS_TOKEN not configured');
       return Response.json({ 
         success: false, 
-        error: 'Missing VERCEL_ACCESS_TOKEN',
-        logs: results,
-        data: { activation, expiry }
-      });
+        error: 'Server configuration error' 
+      }, { status: 500 });
     }
-    
+
     const updateResponse = await fetch(
       `https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`,
       {
@@ -100,44 +94,115 @@ export async function GET(request: NextRequest) {
         },
         body: JSON.stringify({
           items: [
-            { operation: 'upsert', key: 'cetus_start', value: parseInt(activation) },
-            { operation: 'upsert', key: 'cetus_end', value: parseInt(expiry) },
-            { operation: 'upsert', key: 'synced_at', value: syncedAt },
+            { operation: 'upsert', key: 'cetus_start', value: activationTs },
+            { operation: 'upsert', key: 'cetus_end', value: expiryTs },
+            { operation: 'upsert', key: 'synced_at', value: now },
           ],
         }),
       }
     );
-    
+
     if (!updateResponse.ok) {
-      const errorText = await updateResponse.text();
-      results.push(`Edge Config update failed: ${errorText}`);
       return Response.json({ 
         success: false, 
-        error: 'Edge Config update failed',
-        logs: results 
-      });
+        error: 'Failed to update storage' 
+      }, { status: 500 });
     }
-    
-    results.push('Edge Config updated successfully');
-    
+
     return Response.json({
       success: true,
+      action: 'updated',
       data: {
-        activation: parseInt(activation),
-        expiry: parseInt(expiry),
-        syncedAt,
+        activation: activationTs,
+        expiry: expiryTs,
+        syncedAt: now,
       },
-      logs: results,
     });
-    
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    results.push(`Error: ${errorMessage}`);
-    
     return Response.json({
       success: false,
       error: errorMessage,
-      logs: results,
+    }, { status: 500 });
+  }
+}
+
+// GET: Server-side sync (for cron - will fail due to IP blocking, kept for reference)
+export async function GET(request: NextRequest) {
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isTest = request.nextUrl.searchParams.get('test') === '1';
+  
+  if (!isVercelCron && !isTest) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Note: This will likely fail due to Warframe API blocking cloud IPs
+  // Client-side POST is the preferred method
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    
+    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    
+    if (!response.ok) {
+      return Response.json({ 
+        success: false, 
+        error: `Warframe API returned ${response.status}`,
+        note: 'Cloud IPs are typically blocked. Use client-side sync instead.'
+      });
+    }
+    
+    const data = await response.json();
+    const cetusMission = data.SyndicateMissions?.find((m: { Tag: string }) => m.Tag === 'CetusSyndicate');
+    
+    if (!cetusMission) {
+      return Response.json({ success: false, error: 'CetusSyndicate not found' });
+    }
+    
+    const activation = parseInt(cetusMission.Activation.$date.$numberLong);
+    const expiry = parseInt(cetusMission.Expiry.$date.$numberLong);
+    
+    // Use the same update logic as POST
+    const vercelToken = process.env.VERCEL_ACCESS_TOKEN;
+    if (!vercelToken) {
+      return Response.json({ success: false, error: 'Missing token' }, { status: 500 });
+    }
+
+    const updateResponse = await fetch(
+      `https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${vercelToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            { operation: 'upsert', key: 'cetus_start', value: activation },
+            { operation: 'upsert', key: 'cetus_end', value: expiry },
+            { operation: 'upsert', key: 'synced_at', value: Date.now() },
+          ],
+        }),
+      }
+    );
+
+    if (!updateResponse.ok) {
+      return Response.json({ success: false, error: 'Edge Config update failed' });
+    }
+
+    return Response.json({
+      success: true,
+      data: { activation, expiry, syncedAt: Date.now() },
+    });
+    
+  } catch (error) {
+    return Response.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 }

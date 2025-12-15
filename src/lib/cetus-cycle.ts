@@ -15,6 +15,9 @@ let cachedCycleStart: number | null = null;
 let lastFetchTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // Refresh API data every 5 minutes
 
+// Track if we've already attempted server sync this session
+let hasAttemptedServerSync = false;
+
 export interface CetusCycleState {
   isDay: boolean;
   state: 'day' | 'night';
@@ -85,6 +88,32 @@ function saveToStorage(cycleStart: number): void {
   }
 }
 
+// Submit sync data to server (updates Edge Config for all users)
+async function submitSyncToServer(cycleStart: number, cycleEnd: number): Promise<boolean> {
+  if (hasAttemptedServerSync) return false; // Only attempt once per session
+  hasAttemptedServerSync = true;
+
+  try {
+    const response = await fetch('/api/sync-cetus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activation: cycleStart, expiry: cycleEnd }),
+    });
+
+    if (!response.ok) {
+      console.log('[Cetus] Server sync failed:', response.status);
+      return false;
+    }
+
+    const result = await response.json();
+    console.log('[Cetus] Server sync result:', result);
+    return result.success && result.action === 'updated';
+  } catch (error) {
+    console.log('[Cetus] Server sync error:', error);
+    return false;
+  }
+}
+
 // Fetch DIRECTLY from Warframe API in the browser (bypasses cloud IP blocks)
 async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
   if (typeof window === 'undefined') return null; // Only run client-side
@@ -93,7 +122,8 @@ async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycle
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch('https://content.warframe.com/dynamic/worldState.php', {
+    // Try the CDN endpoint first (more reliable)
+    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
       signal: controller.signal,
       cache: 'no-store',
     });
@@ -111,6 +141,10 @@ async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycle
       // Validate timestamps
       if (cycleStart > 1577836800000 && cycleEnd > cycleStart) {
         console.log('[Cetus] Direct API fetch successful:', { cycleStart, cycleEnd });
+        
+        // Submit to server to update Edge Config for all users
+        submitSyncToServer(cycleStart, cycleEnd);
+        
         return { cycleStart, cycleEnd };
       }
     }

@@ -1016,21 +1016,11 @@ export function CetusClock() {
               opacity={0.6}
             />
 
-            {/* Orokin Day/Night Transition Icon - 40x40 centered below label */}
+            {/* Orokin Day/Night Icon - 40x40 centered below label */}
             {(() => {
               const iconSize = 40;
               const iconX = center - iconSize / 2;
               const iconY = center + size * 0.145;
-
-              // During day: sun with center filling dark left-to-right, ring/rays fade out
-              // During night: moon (just circle) with gold filling left-to-right, ring/rays fade in
-              const fillProgress = cycleProgress / 100; // 0 to 1
-              const fillWidth512 = fillProgress * 512;
-
-              // Ring and rays opacity: visible during day, hidden during night
-              // Day: sun with ring and rays
-              // Night: just the circle (moon) - no ring/rays
-              const sunElementsOpacity = isDay ? 1 : 0;
 
               return (
                 <svg
@@ -1038,60 +1028,36 @@ export function CetusClock() {
                   y={iconY}
                   width={iconSize}
                   height={iconSize}
-                  viewBox="0 0 512 512"
+                  viewBox="0 0 64 64"
                   overflow="visible"
                 >
-                  <defs>
-                    <clipPath id="orokin-fill-clip">
-                      <rect x="0" y="0" width={fillWidth512} height="512" />
-                    </clipPath>
-                    <clipPath id="orokin-unfill-clip">
-                      <rect x={fillWidth512} y="0" width={512 - fillWidth512} height="512" />
-                    </clipPath>
-                  </defs>
-
-                  {/* Outer ring - fades with sun */}
-                  <circle
-                    cx="256" cy="256" r="120"
-                    fill="none"
-                    stroke={COLORS.goldPrimary}
-                    strokeWidth="16"
-                    opacity={sunElementsOpacity}
-                  />
-
-                  {/* Rays - fade with sun */}
-                  <g opacity={sunElementsOpacity}>
-                    <path d="M256 96 L256 136" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M256 376 L256 416" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M96 256 L136 256" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M376 256 L416 256" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M143 143 L171 171" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M341 341 L369 369" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M143 369 L171 341" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                    <path d="M341 171 L369 143" stroke={COLORS.goldPrimary} strokeWidth="12" strokeLinecap="round"/>
-                  </g>
-
-                  {/* Inner circle - the part that transitions */}
                   {isDay ? (
+                    /* Sun icon - circle with rays */
                     <>
-                      {/* Day: gold on right (unfilled), dark on left (filled) */}
-                      <g clipPath="url(#orokin-unfill-clip)">
-                        <circle cx="256" cy="256" r="60" fill={COLORS.goldPrimary}/>
-                      </g>
-                      <g clipPath="url(#orokin-fill-clip)">
-                        <circle cx="256" cy="256" r="60" fill={COLORS.goldGlow} opacity="0.3"/>
+                      {/* Sun center */}
+                      <circle cx="32" cy="32" r="10" fill={COLORS.goldPrimary} />
+                      {/* Sun rays */}
+                      <g stroke={COLORS.goldPrimary} strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="32" y1="8" x2="32" y2="16" />
+                        <line x1="32" y1="48" x2="32" y2="56" />
+                        <line x1="8" y1="32" x2="16" y2="32" />
+                        <line x1="48" y1="32" x2="56" y2="32" />
+                        <line x1="14.5" y1="14.5" x2="20.2" y2="20.2" />
+                        <line x1="43.8" y1="43.8" x2="49.5" y2="49.5" />
+                        <line x1="14.5" y1="49.5" x2="20.2" y2="43.8" />
+                        <line x1="43.8" y1="20.2" x2="49.5" y2="14.5" />
                       </g>
                     </>
                   ) : (
-                    <>
-                      {/* Night: dark on right (unfilled), gold on left (filled) */}
-                      <g clipPath="url(#orokin-unfill-clip)">
-                        <circle cx="256" cy="256" r="60" fill={COLORS.goldGlow} opacity="0.3"/>
-                      </g>
-                      <g clipPath="url(#orokin-fill-clip)">
-                        <circle cx="256" cy="256" r="60" fill={COLORS.goldPrimary}/>
-                      </g>
-                    </>
+                    /* Crescent moon icon */
+                    <path
+                      d="M 38 16 
+                         C 28 16, 20 24, 20 32 
+                         C 20 40, 28 48, 38 48 
+                         C 32 44, 28 38, 28 32 
+                         C 28 26, 32 20, 38 16 Z"
+                      fill={COLORS.goldPrimary}
+                    />
                   )}
                 </svg>
               );
