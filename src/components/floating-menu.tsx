@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '@/hooks/use-notifications';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { useApiStatus } from '@/hooks/use-api-status';
+import { useSound } from '@/hooks/use-sound';
 
 // Color tokens matching the design system
 const COLORS = {
@@ -42,15 +43,37 @@ export function FloatingMenu() {
   // For close sequence
   const [isClosing, setIsClosing] = useState(false);
 
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // Refs for measuring panel heights
   const panel1Ref = useRef<HTMLDivElement>(null);
   const panel2Ref = useRef<HTMLDivElement>(null);
   const [panel1Height, setPanel1Height] = useState(0);
   const [panel2Height, setPanel2Height] = useState(0);
 
-  const { isSupported, isEnabled, permission, toggleNotifications } = useNotifications();
+  const { isSupported, isEnabled: notificationsEnabled, permission, toggleNotifications } = useNotifications();
   const { canInstall, install, isInstalled } = usePWAInstall();
   const { status: apiStatus, source: apiSource, checkConnection } = useApiStatus();
+  const { playSound, isEnabled: soundEnabled, toggleSound } = useSound();
+
+  // Listen for fullscreen changes (e.g., user presses Escape)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  }, []);
 
   // Measure panel heights after animations complete
   useEffect(() => {
@@ -85,6 +108,7 @@ export function FloatingMenu() {
 
   // Handle open sequence
   const handleOpen = useCallback(() => {
+    playSound('menuOpen');
     setIsOpen(true);
     setIsClosing(false);
 
@@ -98,10 +122,11 @@ export function FloatingMenu() {
         setPanel3Visible(true);
       }, 100);
     }, 350 + 100); // Panel 1 animation (350ms) + 100ms wait
-  }, []);
+  }, [playSound]);
 
   // Handle close sequence
   const handleClose = useCallback(() => {
+    playSound('menuClose');
     setIsClosing(true);
 
     // Step 1: Panel 3 slides up
@@ -118,7 +143,7 @@ export function FloatingMenu() {
         setIsClosing(false);
       }, SLIDE_DURATION * 1000);
     }, SLIDE_DURATION * 1000);
-  }, []);
+  }, [playSound]);
 
   const handleToggle = useCallback(() => {
     if (isOpen) {
@@ -270,7 +295,7 @@ export function FloatingMenu() {
                 >
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  {!isEnabled && <line x1="1" y1="1" x2="23" y2="23" />}
+                  {!notificationsEnabled && <line x1="1" y1="1" x2="23" y2="23" />}
                 </svg>
                 <span
                   className="text-sm"
@@ -286,19 +311,157 @@ export function FloatingMenu() {
               <div
                 className="w-9 h-5 rounded-full relative transition-colors duration-200"
                 style={{
-                  backgroundColor: isEnabled ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
+                  backgroundColor: notificationsEnabled ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
                 }}
               >
                 <div
                   className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
                   style={{
-                    backgroundColor: isEnabled ? '#0a0a0c' : COLORS.goldPrimary,
-                    transform: isEnabled ? 'translateX(18px)' : 'translateX(2px)',
+                    backgroundColor: notificationsEnabled ? '#0a0a0c' : COLORS.goldPrimary,
+                    transform: notificationsEnabled ? 'translateX(18px)' : 'translateX(2px)',
                   }}
                 />
               </div>
             </button>
           )}
+
+          {/* Sound Toggle */}
+          <button
+            onClick={toggleSound}
+            className="w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 mt-2"
+            style={{
+              backgroundColor: 'rgba(201, 169, 97, 0.05)',
+              border: `1px solid transparent`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = COLORS.goldPrimary;
+              e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'transparent';
+              e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.05)';
+            }}
+          >
+            <div className="flex items-center gap-3">
+              {/* Speaker Icon */}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={COLORS.goldPrimary}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                {soundEnabled ? (
+                  <>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </>
+                ) : (
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                )}
+              </svg>
+              <span
+                className="text-sm"
+                style={{
+                  fontFamily: FONTS.notoSans,
+                  color: COLORS.goldPrimary,
+                }}
+              >
+                Sound
+              </span>
+            </div>
+            {/* Toggle Switch */}
+            <div
+              className="w-9 h-5 rounded-full relative transition-colors duration-200"
+              style={{
+                backgroundColor: soundEnabled ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
+              }}
+            >
+              <div
+                className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
+                style={{
+                  backgroundColor: soundEnabled ? '#0a0a0c' : COLORS.goldPrimary,
+                  transform: soundEnabled ? 'translateX(18px)' : 'translateX(2px)',
+                }}
+              />
+            </div>
+          </button>
+
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className="w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 mt-2"
+            style={{
+              backgroundColor: 'rgba(201, 169, 97, 0.05)',
+              border: `1px solid transparent`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = COLORS.goldPrimary;
+              e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'transparent';
+              e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.05)';
+            }}
+          >
+            <div className="flex items-center gap-3">
+              {/* Fullscreen Icon */}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={COLORS.goldPrimary}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {isFullscreen ? (
+                  <>
+                    <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+                    <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+                    <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+                    <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                    <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+                    <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+                    <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+                  </>
+                )}
+              </svg>
+              <span
+                className="text-sm"
+                style={{
+                  fontFamily: FONTS.notoSans,
+                  color: COLORS.goldPrimary,
+                }}
+              >
+                Full Screen
+              </span>
+            </div>
+            {/* Toggle Switch */}
+            <div
+              className="w-9 h-5 rounded-full relative transition-colors duration-200"
+              style={{
+                backgroundColor: isFullscreen ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
+              }}
+            >
+              <div
+                className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
+                style={{
+                  backgroundColor: isFullscreen ? '#0a0a0c' : COLORS.goldPrimary,
+                  transform: isFullscreen ? 'translateX(18px)' : 'translateX(2px)',
+                }}
+              />
+            </div>
+          </button>
         </div>
       </div>
 

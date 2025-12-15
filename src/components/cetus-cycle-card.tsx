@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { getCetusCycleState, syncCetusCycle, formatNextCycleTime, getSyncStatus, type CetusCycleState, type SyncStatus } from '@/lib/cetus-cycle';
 import { Sun, Moon, AlertTriangle } from 'lucide-react';
+import { useSound } from '@/hooks/use-sound';
 
 export function CetusCycleCard() {
   const [cycleState, setCycleState] = useState<CetusCycleState | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [mounted, setMounted] = useState(false);
+  const prevIsDayRef = useRef<boolean | null>(null);
+  const { playSound } = useSound();
 
   const updateCycleState = useCallback(() => {
     setCycleState(getCetusCycleState());
@@ -38,6 +41,17 @@ export function CetusCycleCard() {
       clearInterval(syncInterval);
     };
   }, [updateCycleState]);
+
+  // Play sound when cycle transitions from day to night or night to day
+  useEffect(() => {
+    if (cycleState === null) return;
+
+    // Only play sound after initial load (not on first render)
+    if (prevIsDayRef.current !== null && prevIsDayRef.current !== cycleState.isDay) {
+      playSound('cycleTransition');
+    }
+    prevIsDayRef.current = cycleState.isDay;
+  }, [cycleState?.isDay, playSound]);
 
   // Prevent hydration mismatch
   if (!mounted || !cycleState) {
