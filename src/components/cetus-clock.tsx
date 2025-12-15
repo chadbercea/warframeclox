@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
 import { useMouseParallax } from '@/hooks/use-mouse-parallax';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Color tokens - mapped from CSS custom properties
 // See globals.css for token definitions
@@ -1019,6 +1020,73 @@ export function CetusClock() {
               const iconX = center - iconSize / 2;
               const iconY = center + size * 0.145;
 
+              // Ray animation variants with staggered timing
+              const rayVariants = {
+                initial: { scale: 0, opacity: 0 },
+                animate: (i: number) => ({
+                  scale: 1,
+                  opacity: 1,
+                  transition: {
+                    delay: i * 0.04,
+                    duration: 0.25,
+                    ease: 'easeOut' as const,
+                  },
+                }),
+                exit: (i: number) => ({
+                  scale: 0,
+                  opacity: 0,
+                  transition: {
+                    delay: (7 - i) * 0.03,
+                    duration: 0.2,
+                    ease: 'easeIn' as const,
+                  },
+                }),
+              };
+
+              // Sun center variants
+              const sunCenterVariants = {
+                initial: { scale: 0.5, opacity: 0 },
+                animate: {
+                  scale: 1,
+                  opacity: 1,
+                  transition: { duration: 0.3, ease: 'easeOut' as const },
+                },
+                exit: {
+                  scale: 0.8,
+                  opacity: 0,
+                  transition: { duration: 0.25, ease: 'easeIn' as const },
+                },
+              };
+
+              // Moon variants
+              const moonVariants = {
+                initial: { scale: 0.6, opacity: 0, rotate: -30 },
+                animate: {
+                  scale: 1,
+                  opacity: 1,
+                  rotate: 0,
+                  transition: { duration: 0.4, ease: 'easeOut' as const, delay: 0.1 },
+                },
+                exit: {
+                  scale: 0.6,
+                  opacity: 0,
+                  rotate: 30,
+                  transition: { duration: 0.3, ease: 'easeIn' as const },
+                },
+              };
+
+              // Ray line data for staggered animation
+              const rays = [
+                { x1: 32, y1: 8, x2: 32, y2: 16 },
+                { x1: 32, y1: 48, x2: 32, y2: 56 },
+                { x1: 8, y1: 32, x2: 16, y2: 32 },
+                { x1: 48, y1: 32, x2: 56, y2: 32 },
+                { x1: 14.5, y1: 14.5, x2: 20.2, y2: 20.2 },
+                { x1: 43.8, y1: 43.8, x2: 49.5, y2: 49.5 },
+                { x1: 14.5, y1: 49.5, x2: 20.2, y2: 43.8 },
+                { x1: 43.8, y1: 20.2, x2: 49.5, y2: 14.5 },
+              ];
+
               return (
                 <svg
                   x={iconX}
@@ -1028,34 +1096,57 @@ export function CetusClock() {
                   viewBox="0 0 64 64"
                   overflow="visible"
                 >
-                  {isDay ? (
-                    /* Sun icon - circle with rays */
-                    <>
-                      {/* Sun center */}
-                      <circle cx="32" cy="32" r="10" fill={COLORS.goldPrimary} />
-                      {/* Sun rays */}
-                      <g stroke={COLORS.goldPrimary} strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="32" y1="8" x2="32" y2="16" />
-                        <line x1="32" y1="48" x2="32" y2="56" />
-                        <line x1="8" y1="32" x2="16" y2="32" />
-                        <line x1="48" y1="32" x2="56" y2="32" />
-                        <line x1="14.5" y1="14.5" x2="20.2" y2="20.2" />
-                        <line x1="43.8" y1="43.8" x2="49.5" y2="49.5" />
-                        <line x1="14.5" y1="49.5" x2="20.2" y2="43.8" />
-                        <line x1="43.8" y1="20.2" x2="49.5" y2="14.5" />
-                      </g>
-                    </>
-                  ) : (
-                    /* Crescent moon icon */
-                    <path
-                      d="M 38 16 
-                         C 28 16, 20 24, 20 32 
-                         C 20 40, 28 48, 38 48 
-                         C 32 44, 28 38, 28 32 
-                         C 28 26, 32 20, 38 16 Z"
-                      fill={COLORS.goldPrimary}
-                    />
-                  )}
+                  <AnimatePresence mode="wait">
+                    {isDay ? (
+                      /* Sun icon - circle with rays */
+                      <motion.g
+                        key="sun"
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                      >
+                        {/* Sun center */}
+                        <motion.circle
+                          cx="32"
+                          cy="32"
+                          r="10"
+                          fill={COLORS.goldPrimary}
+                          variants={sunCenterVariants}
+                        />
+                        {/* Sun rays - staggered animation */}
+                        <g stroke={COLORS.goldPrimary} strokeWidth="2.5" strokeLinecap="round">
+                          {rays.map((ray, i) => (
+                            <motion.line
+                              key={i}
+                              x1={ray.x1}
+                              y1={ray.y1}
+                              x2={ray.x2}
+                              y2={ray.y2}
+                              variants={rayVariants}
+                              custom={i}
+                              style={{ originX: '32px', originY: '32px' }}
+                            />
+                          ))}
+                        </g>
+                      </motion.g>
+                    ) : (
+                      /* Crescent moon icon */
+                      <motion.path
+                        key="moon"
+                        d="M 38 16 
+                           C 28 16, 20 24, 20 32 
+                           C 20 40, 28 48, 38 48 
+                           C 32 44, 28 38, 28 32 
+                           C 28 26, 32 20, 38 16 Z"
+                        fill={COLORS.goldPrimary}
+                        variants={moonVariants}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        style={{ originX: '32px', originY: '32px' }}
+                      />
+                    )}
+                  </AnimatePresence>
                 </svg>
               );
             })()}
