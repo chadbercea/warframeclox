@@ -9,12 +9,13 @@ const EDGE_CONFIG_ID = 'ecfg_i7wukxkcxmejcih7vtkpfcthms6b';
 // Minimum time between updates (5 minutes) - prevents spam
 const MIN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
-// Validate timestamp is reasonable (not too old, not in the future)
-function isValidTimestamp(ts: number): boolean {
+// Validate timestamp is reasonable (not too old, not too far in the future)
+function isValidTimestamp(ts: number, allowFuture: boolean = false): boolean {
   const now = Date.now();
   const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
-  const oneHourAhead = now + 60 * 60 * 1000;
-  return ts > oneYearAgo && ts < oneHourAhead;
+  // Expiry can be up to 3 hours in the future (cycle is 2.5 hours)
+  const maxFuture = allowFuture ? now + 3 * 60 * 60 * 1000 : now + 60 * 60 * 1000;
+  return ts > oneYearAgo && ts < maxFuture;
 }
 
 // POST: Accept sync data from client browsers (residential IPs)
@@ -34,8 +35,8 @@ export async function POST(request: NextRequest) {
     const activationTs = typeof activation === 'string' ? parseInt(activation) : activation;
     const expiryTs = typeof expiry === 'string' ? parseInt(expiry) : expiry;
 
-    // Validate timestamps are reasonable
-    if (!isValidTimestamp(activationTs) || !isValidTimestamp(expiryTs)) {
+    // Validate timestamps are reasonable (expiry can be in future)
+    if (!isValidTimestamp(activationTs) || !isValidTimestamp(expiryTs, true)) {
       return Response.json({ 
         success: false, 
         error: 'Invalid timestamp range' 
