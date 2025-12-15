@@ -90,7 +90,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ overflow: 'hidden', height: '100%', touchAction: 'none', background: '#000000' }}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -99,6 +99,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ailerons.variable} ${notoSans.variable} ${flareserif.variable} antialiased`}
         suppressHydrationWarning
+        style={{ overflow: 'hidden', position: 'fixed', inset: 0, touchAction: 'none', background: '#000000' }}
       >
         <ServiceWorkerProvider>
           {children}

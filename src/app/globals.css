@@ -104,22 +104,20 @@
   }
 
   html {
-    @apply bg-background text-foreground;
+    background: #000000;
     height: 100%;
-    height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
+    touch-action: none;
   }
 
   body {
-    @apply bg-background text-foreground;
+    background: #000000;
     position: fixed;
     inset: 0;
     overflow: hidden;
     overscroll-behavior: none;
-    /* Block all touch-initiated scroll/zoom */
     touch-action: none;
-    -webkit-overflow-scrolling: touch;
   }
 
   /* Allow interactive elements to be tappable */
