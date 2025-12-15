@@ -1,0 +1,59 @@
+name: Daily World State Sync
+on:
+  schedule:
+    - cron: '0 12 * * *'  # Noon UTC daily
+  workflow_dispatch:      # Manual trigger only
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch World State
+        id: fetch
+        run: |
+          curl -sf https://api.warframe.com/cdn/worldState.php > worldstate.json
+          if [ $? -eq 0 ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "Fetch failed - skipping update"
+            exit 0
+          fi
+
+      - name: Parse Cetus Cycle
+        if: steps.fetch.outputs.success == 'true'
+        id: parse
+        run: |
+          START=$(jq -r '.SyndicateMissions[] | select(.Tag == "CetusSyndicate") | .Activation."$date"."$numberLong"' worldstate.json)
+          END=$(jq -r '.SyndicateMissions[] | select(.Tag == "CetusSyndicate") | .Expiry."$date"."$numberLong"' worldstate.json)
+
+          if [ -z "$START" ] || [ "$START" = "null" ]; then
+            echo "Parse failed - invalid data"
+            exit 0
+          fi
+
+          echo "start=$START" >> $GITHUB_OUTPUT
+          echo "end=$END" >> $GITHUB_OUTPUT
+
+      - name: Update Edge Config
+        if: steps.parse.outputs.start != ''
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          EDGE_CONFIG_ID: ${{ secrets.EDGE_CONFIG_ID }}
+        run: |
+          TIMESTAMP=$(date +%s)000
+
+          curl -X PATCH \
+            "https://api.vercel.com/v1/edge-config/$EDGE_CONFIG_ID/items" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"items\": [
+                {\"operation\": \"upsert\", \"key\": \"cetus_start\", \"value\": ${{ steps.parse.outputs.start }}},
+                {\"operation\": \"upsert\", \"key\": \"cetus_end\", \"value\": ${{ steps.parse.outputs.end }}},
+                {\"operation\": \"upsert\", \"key\": \"synced_at\", \"value\": $TIMESTAMP}
+              ]
+            }"
+
+          echo "Edge Config updated at $TIMESTAMP"

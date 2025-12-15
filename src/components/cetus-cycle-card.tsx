@@ -2,38 +2,111 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { getCetusCycleState, syncCetusCycle, formatNextCycleTime, type CetusCycleState } from '@/lib/cetus-cycle';
 import { Sun, Moon } from 'lucide-react';
 
+const CYCLE_LENGTH = 9000000;  // 150 minutes in ms
+const DAY_LENGTH = 6000000;    // 100 minutes in ms
+const NIGHT_LENGTH = 3000000;  // 50 minutes in ms
+
+interface CycleData {
+  cycleStart: number;
+  cycleEnd: number;
+  isDay: boolean;
+  syncedAt?: number;
+  source: string;
+}
+
+interface CycleState {
+  isDay: boolean;
+  timeLeftMs: number;
+  timeLeftFormatted: string;
+  nextCycleTime: Date;
+  percentComplete: number;
+}
+
+function formatTimeLeft(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatNextCycleTime(date: Date): string {
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+function calculateState(cycleStart: number): CycleState {
+  const now = Date.now();
+  const elapsed = now - cycleStart;
+  const positionInCycle = ((elapsed % CYCLE_LENGTH) + CYCLE_LENGTH) % CYCLE_LENGTH;
+  const isDay = positionInCycle < DAY_LENGTH;
+
+  let timeLeftMs: number;
+  let percentComplete: number;
+
+  if (isDay) {
+    timeLeftMs = DAY_LENGTH - positionInCycle;
+    percentComplete = (positionInCycle / DAY_LENGTH) * 100;
+  } else {
+    const positionInNight = positionInCycle - DAY_LENGTH;
+    timeLeftMs = NIGHT_LENGTH - positionInNight;
+    percentComplete = (positionInNight / NIGHT_LENGTH) * 100;
+  }
+
+  return {
+    isDay,
+    timeLeftMs,
+    timeLeftFormatted: formatTimeLeft(timeLeftMs),
+    nextCycleTime: new Date(now + timeLeftMs),
+    percentComplete,
+  };
+}
+
 export function CetusCycleCard() {
-  const [cycleState, setCycleState] = useState<CetusCycleState | null>(null);
+  const [cycleStart, setCycleStart] = useState<number | null>(null);
+  const [cycleState, setCycleState] = useState<CycleState | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  const updateCycleState = useCallback(() => {
-    setCycleState(getCetusCycleState());
-  }, []);
-
+  // Fetch cycle data from API
   useEffect(() => {
     setMounted(true);
 
-    // Initial sync with API
-    syncCetusCycle().then(() => {
-      updateCycleState();
-    });
-
-    // Update display every second
-    const displayInterval = setInterval(updateCycleState, 1000);
-
-    // Sync with API every 5 minutes
-    const syncInterval = setInterval(() => {
-      syncCetusCycle();
-    }, 5 * 60 * 1000);
-
-    return () => {
-      clearInterval(displayInterval);
-      clearInterval(syncInterval);
+    const fetchCycle = async () => {
+      try {
+        const response = await fetch('/api/cetus');
+        if (response.ok) {
+          const data: CycleData = await response.json();
+          setCycleStart(data.cycleStart);
+        }
+      } catch (error) {
+        console.error('Failed to fetch cycle data:', error);
+      }
     };
-  }, [updateCycleState]);
+
+    fetchCycle();
+
+    // Refresh from API every 5 minutes
+    const refreshInterval = setInterval(fetchCycle, 5 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Update display every second
+  useEffect(() => {
+    if (cycleStart === null) return;
+
+    const updateState = () => {
+      setCycleState(calculateState(cycleStart));
+    };
+
+    updateState();
+    const displayInterval = setInterval(updateState, 1000);
+    return () => clearInterval(displayInterval);
+  }, [cycleStart]);
 
   // Prevent hydration mismatch
   if (!mounted || !cycleState) {

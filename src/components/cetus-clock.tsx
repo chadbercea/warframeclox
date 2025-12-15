@@ -1,9 +1,54 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
 import { useMouseParallax } from '@/hooks/use-mouse-parallax';
+
+const CYCLE_LENGTH = 9000000;  // 150 minutes in ms
+const DAY_LENGTH = 6000000;    // 100 minutes in ms
+const NIGHT_LENGTH = 3000000;  // 50 minutes in ms
+
+interface CycleData {
+  cycleStart: number;
+  cycleEnd: number;
+  isDay: boolean;
+  syncedAt?: number;
+  source: string;
+}
+
+function formatTimeLeft(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function calculateCycleState(cycleStart: number) {
+  const now = Date.now();
+  const elapsed = now - cycleStart;
+  const positionInCycle = ((elapsed % CYCLE_LENGTH) + CYCLE_LENGTH) % CYCLE_LENGTH;
+  const isDay = positionInCycle < DAY_LENGTH;
+
+  let timeLeftMs: number;
+  let percentComplete: number;
+
+  if (isDay) {
+    timeLeftMs = DAY_LENGTH - positionInCycle;
+    percentComplete = (positionInCycle / DAY_LENGTH) * 100;
+  } else {
+    const positionInNight = positionInCycle - DAY_LENGTH;
+    timeLeftMs = NIGHT_LENGTH - positionInNight;
+    percentComplete = (positionInNight / NIGHT_LENGTH) * 100;
+  }
+
+  return {
+    isDay,
+    timeLeftMs,
+    timeLeftFormatted: formatTimeLeft(timeLeftMs),
+    percentComplete,
+  };
+}
 
 // Color tokens - mapped from CSS custom properties
 // See globals.css for token definitions
@@ -55,25 +100,25 @@ export function CetusClock() {
   const outerRingRef = useRef<number | null>(null);
   const parallax = useMouseParallax();
 
-  // Sync with API and get cycle data
+  // Fetch cycle data from API
   useEffect(() => {
-    const initCycle = async () => {
-      await syncCetusCycle();
-      const state = getCetusCycleState();
-      setIsDay(state.isDay);
-
-      // Calculate when current cycle started
-      const cycleDuration = state.isDay ? DAY_DURATION_MINUTES : NIGHT_DURATION_MINUTES;
-      const cycleDurationMs = cycleDuration * 60 * 1000;
-      const elapsed = (state.percentComplete / 100) * cycleDurationMs;
-      const cycleStart = Date.now() - elapsed;
-      setCycleStartTimestamp(cycleStart);
+    const fetchCycle = async () => {
+      try {
+        const response = await fetch('/api/cetus');
+        if (response.ok) {
+          const data: CycleData = await response.json();
+          setCycleStartTimestamp(data.cycleStart);
+          setIsDay(data.isDay);
+        }
+      } catch (error) {
+        console.error('Failed to fetch cycle data:', error);
+      }
     };
 
-    initCycle();
+    fetchCycle();
 
     // Re-sync every 5 minutes
-    const interval = setInterval(initCycle, 5 * 60 * 1000);
+    const interval = setInterval(fetchCycle, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -89,7 +134,7 @@ export function CetusClock() {
     setPositions(newPositions);
 
     // Check for cycle transition and update time display
-    const state = getCetusCycleState();
+    const state = calculateCycleState(cycleStartTimestamp);
     setTimeLeft(state.timeLeftFormatted);
 
     if (state.isDay !== isDay) {

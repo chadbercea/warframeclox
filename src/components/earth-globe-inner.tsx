@@ -3,7 +3,35 @@
 import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
+
+const CYCLE_LENGTH = 9000000;  // 150 minutes in ms
+const DAY_LENGTH = 6000000;    // 100 minutes in ms
+const NIGHT_LENGTH = 3000000;  // 50 minutes in ms
+
+interface CycleData {
+  cycleStart: number;
+  cycleEnd: number;
+  isDay: boolean;
+  syncedAt?: number;
+  source: string;
+}
+
+function calculateCycleState(cycleStart: number) {
+  const now = Date.now();
+  const elapsed = now - cycleStart;
+  const positionInCycle = ((elapsed % CYCLE_LENGTH) + CYCLE_LENGTH) % CYCLE_LENGTH;
+  const isDay = positionInCycle < DAY_LENGTH;
+
+  let percentComplete: number;
+  if (isDay) {
+    percentComplete = (positionInCycle / DAY_LENGTH) * 100;
+  } else {
+    const positionInNight = positionInCycle - DAY_LENGTH;
+    percentComplete = (positionInNight / NIGHT_LENGTH) * 100;
+  }
+
+  return { isDay, percentComplete };
+}
 
 const GLOBE_RADIUS = 100;
 const MODEL_SCALE = 2; // 2x larger as requested
@@ -91,10 +119,24 @@ export default function EarthGlobeInner() {
       }
     );
 
-    // Sync cycle
-    syncCetusCycle().then((source) => {
-      console.log('[Earth] Cycle synced from:', source);
-    });
+    // Fetch cycle data
+    let cycleStart: number | null = null;
+
+    const fetchCycle = async () => {
+      try {
+        const response = await fetch('/api/cetus');
+        if (response.ok) {
+          const data: CycleData = await response.json();
+          cycleStart = data.cycleStart;
+          console.log('[Earth] Cycle synced from:', data.source);
+        }
+      } catch (error) {
+        console.error('[Earth] Failed to fetch cycle:', error);
+      }
+    };
+
+    fetchCycle();
+    const syncInterval = setInterval(fetchCycle, 5 * 60 * 1000);
 
     let lastIsDay: boolean | null = null;
 
@@ -102,7 +144,9 @@ export default function EarthGlobeInner() {
     const animate = () => {
       requestAnimationFrame(animate);
 
-      const state = getCetusCycleState();
+      if (cycleStart === null) return;
+
+      const state = calculateCycleState(cycleStart);
 
       // Slow rotation for visual interest (independent of lighting)
       earthGroup.rotation.y += 0.0005;
@@ -161,6 +205,7 @@ export default function EarthGlobeInner() {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      clearInterval(syncInterval);
       if (sceneRef.current) {
         sceneRef.current.renderer.dispose();
         container.removeChild(sceneRef.current.renderer.domElement);

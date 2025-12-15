@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getCetusCycleState, NOTIFICATION_WARNING_TIME } from '@/lib/cetus-cycle';
 
 export type NotificationPermission = 'default' | 'granted' | 'denied';
 
@@ -14,11 +13,47 @@ export interface UseNotificationsReturn {
 }
 
 const STORAGE_KEY = 'warframeclox_notifications_enabled';
+const NOTIFICATION_WARNING_TIME = 5 * 60 * 1000; // 5 minutes before transition
+
+const CYCLE_LENGTH = 9000000;  // 150 minutes in ms
+const DAY_LENGTH = 6000000;    // 100 minutes in ms
+const NIGHT_LENGTH = 3000000;  // 50 minutes in ms
+
+interface CycleData {
+  cycleStart: number;
+  cycleEnd: number;
+  isDay: boolean;
+  syncedAt?: number;
+  source: string;
+}
+
+function calculateCycleState(cycleStart: number) {
+  const now = Date.now();
+  const elapsed = now - cycleStart;
+  const positionInCycle = ((elapsed % CYCLE_LENGTH) + CYCLE_LENGTH) % CYCLE_LENGTH;
+  const isDay = positionInCycle < DAY_LENGTH;
+
+  let timeLeftMs: number;
+  if (isDay) {
+    timeLeftMs = DAY_LENGTH - positionInCycle;
+  } else {
+    const positionInNight = positionInCycle - DAY_LENGTH;
+    timeLeftMs = NIGHT_LENGTH - positionInNight;
+  }
+
+  return {
+    isDay,
+    state: isDay ? 'day' : 'night',
+    timeLeftMs,
+    nextCycleTime: new Date(now + timeLeftMs),
+  };
+}
 
 export function useNotifications(): UseNotificationsReturn {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [cycleStart, setCycleStart] = useState<number | null>(null);
   const lastNotificationRef = useRef<string | null>(null);
   const warningNotifiedRef = useRef<string | null>(null);
 
@@ -34,6 +69,25 @@ export function useNotifications(): UseNotificationsReturn {
         setIsEnabled(true);
       }
     }
+  }, []);
+
+  // Fetch cycle data
+  useEffect(() => {
+    const fetchCycle = async () => {
+      try {
+        const response = await fetch('/api/cetus');
+        if (response.ok) {
+          const data: CycleData = await response.json();
+          setCycleStart(data.cycleStart);
+        }
+      } catch (error) {
+        console.error('Failed to fetch cycle data:', error);
+      }
+    };
+
+    fetchCycle();
+    const interval = setInterval(fetchCycle, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const requestPermission = useCallback(async () => {
@@ -67,10 +121,10 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Send notifications at appropriate times
   useEffect(() => {
-    if (!isEnabled || !isSupported) return;
+    if (!isEnabled || !isSupported || cycleStart === null) return;
 
     const checkAndNotify = () => {
-      const cycleState = getCetusCycleState();
+      const cycleState = calculateCycleState(cycleStart);
       const cycleKey = `${cycleState.state}-${Math.floor(cycleState.nextCycleTime.getTime() / 60000)}`;
       const warningKey = `warning-${cycleKey}`;
 
@@ -111,7 +165,7 @@ export function useNotifications(): UseNotificationsReturn {
     const interval = setInterval(checkAndNotify, 1000);
 
     return () => clearInterval(interval);
-  }, [isEnabled, isSupported]);
+  }, [isEnabled, isSupported, cycleStart]);
 
   return {
     permission,

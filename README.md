@@ -14,7 +14,7 @@ A fast, accurate, offline-capable PWA that shows exactly when night begins—wit
 
 - **Framework**: Next.js 16 (App Router)
 - **UI**: Shadcn UI + Tailwind CSS
-- **API**: Official Warframe World State (`content.warframe.com/dynamic/worldState.php`)
+- **Data Sync**: GitHub Actions + Vercel Edge Config
 - **PWA**: Service worker with stale-while-revalidate caching
 - **Notifications**: Web Notifications API
 - **Deployment**: Vercel
@@ -23,39 +23,42 @@ A fast, accurate, offline-capable PWA that shows exactly when night begins—wit
 
 ### Data Sync Architecture
 
-The Warframe API blocks requests from cloud provider IPs (Vercel, AWS, GitHub Actions, etc.). To solve this, the app uses a **cascading data source strategy**:
+```
+Warframe API → GitHub Action (daily) → Vercel Edge Config → /api/cetus → Components
+```
+
+The Cetus cycle is deterministic (150 min total). Once synced, timing stays accurate indefinitely. A GitHub Action runs daily to sync the current cycle timestamp to Edge Config. Components fetch from `/api/cetus` and calculate display state locally.
+
+**Why not fetch directly from Warframe?**
+- **CORS**: Warframe API has no CORS headers—browser JavaScript can't read responses
+- **IP Blocking**: Cloud provider IPs (Vercel, GitHub) are intermittently blocked
+
+The daily sync + calculation approach bypasses both problems.
 
 | Priority | Source | Description |
 |----------|--------|-------------|
-| 1 | **Direct API** | User's browser fetches directly from `content.warframe.com` (residential IPs aren't blocked) |
-| 2 | **Edge Config** | Vercel Edge Config with pre-seeded reference timestamp |
-| 3 | **LocalStorage** | Cached timestamp from a previous successful browser fetch |
-| 4 | **Calculated** | Hardcoded reference timestamp as last resort |
-
-This means:
-- **Most users** get real-time data directly from Warframe via their browser
-- **Corporate/VPN users** fall back to Edge Config or cached data
-- **Offline users** still get accurate timing from localStorage or calculation
-
-The cycle is deterministic (150 min total), so once synced, timing stays accurate indefinitely.
+| 1 | **Edge Config** | Synced daily from Warframe API via GitHub Action |
+| 2 | **Calculated** | Deterministic fallback from reference timestamp |
 
 ### Cycle Calculation
 
-The app fetches cycle data from Digital Extremes' official World State API:
+Once we know any cycle start time, we can calculate all cycles:
 
 ```
-GET https://content.warframe.com/dynamic/worldState.php
+CYCLE_LENGTH = 150 minutes
+DAY_LENGTH   = 100 minutes
+NIGHT_LENGTH = 50 minutes
 ```
 
-The `SyndicateMissions` array contains a `CetusSyndicate` entry with `Activation` and `Expiry` timestamps marking the current cycle boundaries. The app syncs with this API every 5 minutes and calculates the countdown client-side between syncs.
+The app fetches cycle data every 5 minutes and calculates countdown client-side between syncs.
 
 ### Offline Support
 
-The service worker caches the app shell and uses a stale-while-revalidate strategy—serve cached content immediately, fetch fresh data in the background. If the API is unreachable, the app falls back to localStorage or calculation from a known epoch.
+The service worker caches the app shell and uses stale-while-revalidate. If offline, the calculated fallback provides accurate timing.
 
 ### Notifications
 
-Browser notifications fire at two points:
+Browser notifications fire at:
 1. **5-minute warning** before transition
 2. **At transition** when the cycle changes
 
@@ -69,20 +72,11 @@ Verify the API is working:
 curl -s "https://warframeclox.vercel.app/api/cetus" | jq
 ```
 
-Or open https://warframeclox.vercel.app/api/cetus in your browser.
-
 Response fields:
 - `cycleStart` / `cycleEnd` - Unix timestamps (ms) for current cycle
 - `isDay` - Boolean indicating day/night
 - `fetchedAt` - When the response was generated
-- `source` - Which data source provided the cycle data:
-  - `direct-api` - User's browser fetched directly from Warframe API
-  - `edge-config` - Vercel Edge Config (pre-seeded reference)
-  - `warframestat` - warframestat.us community API
-  - `warframe-api` - Official Warframe API (server-side)
-  - `localStorage` - Cached from previous browser fetch
-  - `calculated` - Local fallback calculation
-- `responseTime` - API response time in ms (not present for calculated)
+- `source` - Data source: `edge-config` or `calculated`
 - `syncedAt` - When Edge Config was last synced (only for edge-config source)
 
 ## Development
@@ -106,47 +100,47 @@ npm start
 ```
 src/
 ├── app/
-│   ├── layout.tsx      # Root layout with PWA config
-│   └── page.tsx        # Landing page
+│   ├── api/cetus/route.ts   # Edge Config reader + fallback
+│   ├── layout.tsx           # Root layout with PWA config
+│   └── page.tsx             # Landing page
 ├── components/
-│   ├── cetus-cycle-card.tsx  # Main cycle display
-│   ├── header.tsx      # Nav with notification/install toggles
-│   └── footer.tsx      # Offline indicator + cache clear
+│   ├── cetus-cycle-card.tsx # Main cycle display
+│   ├── cetus-clock.tsx      # Countdown timer
+│   ├── earth-globe-inner.tsx # 3D globe visualization
+│   └── floating-menu.tsx    # Settings menu
 ├── hooks/
-│   ├── use-notifications.ts  # Web Notifications API
-│   ├── use-pwa-install.ts    # Install prompt handling
-│   ├── use-online-status.ts  # Online/offline detection
-│   └── use-cache-clear.ts    # Cache clearing utility
-└── lib/
-    └── cetus-cycle.ts  # Cycle calculation engine
+│   ├── use-notifications.ts # Web Notifications API
+│   ├── use-api-status.ts    # Connection status
+│   └── use-pwa-install.ts   # Install prompt handling
+.github/
+└── workflows/
+    └── daily-worldstate-sync.yml  # Daily Warframe API sync
 ```
 
 ## Maintenance
 
 ### API Changes
 
-The Warframe World State API is unofficial but stable. If the response format changes:
-1. Check `SyndicateMissions` array structure in `src/lib/cetus-cycle.ts`
-2. Update the `WorldStateResponse` interface
-3. Verify the `CetusSyndicate` tag still exists
-
-### Cache Issues
-
-Users can clear the PWA cache via the "Clear cache" link in the footer. This:
-- Deletes all service worker caches
-- Unregisters the service worker
-- Clears localStorage
-- Forces a fresh reload
-
-For development, bump `CACHE_NAME` in `public/sw.js` to invalidate old caches.
+If the Warframe World State API format changes:
+1. Update the GitHub Action parsing logic
+2. Verify `SyndicateMissions` structure and `CetusSyndicate` tag
 
 ### Cycle Timing Changes
 
 If Digital Extremes changes the Cetus cycle duration:
-1. Update constants in `src/lib/cetus-cycle.ts`:
-   - `CETUS_DAY_DURATION`
-   - `CETUS_NIGHT_DURATION`
-2. Update `FALLBACK_EPOCH` with a recent known cycle start
+1. Update constants in `src/app/api/cetus/route.ts`:
+   - `DAY_LENGTH`
+   - `NIGHT_LENGTH`
+   - `CYCLE_LENGTH`
+2. Update `REFERENCE_TIMESTAMP` with a recent known cycle start
+
+### Cache Issues
+
+Users can clear the PWA cache via the footer link. For development, bump `CACHE_NAME` in `public/sw.js`.
+
+## Architecture Documentation
+
+See [METHOD-DOC.md](./METHOD-DOC.md) for detailed architecture documentation.
 
 ## License
 
