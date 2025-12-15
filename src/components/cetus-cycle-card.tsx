@@ -2,15 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { getCetusCycleState, syncCetusCycle, formatNextCycleTime, type CetusCycleState } from '@/lib/cetus-cycle';
-import { Sun, Moon } from 'lucide-react';
+import { getCetusCycleState, syncCetusCycle, formatNextCycleTime, getSyncStatus, type CetusCycleState, type SyncStatus } from '@/lib/cetus-cycle';
+import { Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export function CetusCycleCard() {
   const [cycleState, setCycleState] = useState<CetusCycleState | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [mounted, setMounted] = useState(false);
 
   const updateCycleState = useCallback(() => {
     setCycleState(getCetusCycleState());
+    setSyncStatus(getSyncStatus());
   }, []);
 
   useEffect(() => {
@@ -26,7 +28,9 @@ export function CetusCycleCard() {
 
     // Sync with API every 5 minutes
     const syncInterval = setInterval(() => {
-      syncCetusCycle();
+      syncCetusCycle().then(() => {
+        setSyncStatus(getSyncStatus());
+      });
     }, 5 * 60 * 1000);
 
     return () => {
@@ -138,6 +142,27 @@ export function CetusCycleCard() {
             </span>
           </p>
         </div>
+
+        {/* Sync Warning Banner */}
+        {syncStatus && (syncStatus.isStale || syncStatus.error || syncStatus.warning) && (
+          <div className="mt-4 p-3 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-200">
+              {syncStatus.error && (
+                <p className="font-semibold">{syncStatus.error}</p>
+              )}
+              {syncStatus.warning && (
+                <p>{syncStatus.warning}</p>
+              )}
+              {syncStatus.isStale && !syncStatus.error && (
+                <p>
+                  Data is {syncStatus.daysSinceSync} days old. Timer may drift.
+                  {syncStatus.source === 'fallback' && ' Edge Config token may have expired.'}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

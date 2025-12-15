@@ -25,6 +25,27 @@ export interface CetusCycleState {
   isFromApi: boolean;
 }
 
+export interface SyncStatus {
+  source: string;
+  isStale: boolean;
+  daysSinceSync: number | null;
+  warning: string | null;
+  error: string | null;
+}
+
+// Global sync status
+let syncStatus: SyncStatus = {
+  source: 'unknown',
+  isStale: false,
+  daysSinceSync: null,
+  warning: null,
+  error: null,
+};
+
+export function getSyncStatus(): SyncStatus {
+  return syncStatus;
+}
+
 interface WorldStateResponse {
   SyndicateMissions?: Array<{
     Tag: string;
@@ -106,11 +127,28 @@ export async function fetchCetusCycleFromApi(): Promise<{ cycleStart: number; cy
     if (!response.ok) return null;
 
     const data = await response.json();
+    
+    // Update sync status from API response
+    syncStatus = {
+      source: data.source || 'unknown',
+      isStale: data.isStale || false,
+      daysSinceSync: data.daysSinceSync ?? null,
+      warning: data.warning || null,
+      error: data.error || null,
+    };
+
     if (data.cycleStart && data.cycleEnd) {
       return { cycleStart: data.cycleStart, cycleEnd: data.cycleEnd, source: data.source };
     }
   } catch (error) {
     console.error('Failed to fetch Cetus cycle from API:', error);
+    syncStatus = {
+      source: 'error',
+      isStale: true,
+      daysSinceSync: null,
+      warning: null,
+      error: 'Failed to connect to API',
+    };
   }
   return null;
 }
