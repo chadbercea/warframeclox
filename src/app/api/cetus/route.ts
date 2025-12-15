@@ -1,210 +1,54 @@
 // Server-side API route for Cetus cycle data
-// Priority: Edge Config (synced by GitHub Action) → warframestat.us → Warframe API → calculated fallback
+// Debug: Testing Edge Config connection
+
+import { get } from '@vercel/edge-config';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-// Edge Config direct fetch (bypassing SDK which doesn't work in Edge Runtime)
-const EDGE_CONFIG_URL = 'https://edge-config.vercel.com/ecfg_i7wukxkcxmejcih7vtkpfcthms6b/items?token=5ca683c4-c71e-4c2c-b298-609191067e3b';
-
-// Response types for external APIs
-interface WarframeStatCetusResponse {
-  activation?: string;
-  expiry?: string;
-  isDay?: boolean;
-  state?: string;
-  timeLeft?: string;
-}
-
-interface WorldStateResponse {
-  SyndicateMissions?: Array<{
-    Tag?: string;
-    Activation?: { $date?: { $numberLong?: string } };
-    Expiry?: { $date?: { $numberLong?: string } };
-  }>;
-}
-
-// Cetus cycle constants
-const CETUS_DAY_MS = 100 * 60 * 1000; // 100 minutes
-const CETUS_CYCLE_MS = 150 * 60 * 1000; // 150 minutes total
-
-// Validation helpers
-function isValidTimestamp(ts: number): boolean {
-  // Must be a reasonable timestamp (between 2020 and 2030)
-  return ts > 1577836800000 && ts < 1893456000000;
-}
-
-function validateWarframeStatResponse(data: WarframeStatCetusResponse): { cycleStart: number; cycleEnd: number; isDay: boolean } | null {
-  if (!data.activation || !data.expiry || typeof data.isDay !== 'boolean') {
-    return null;
-  }
-  const cycleStart = new Date(data.activation).getTime();
-  const cycleEnd = new Date(data.expiry).getTime();
-  if (!isValidTimestamp(cycleStart) || !isValidTimestamp(cycleEnd)) {
-    return null;
-  }
-  if (cycleEnd <= cycleStart) {
-    return null;
-  }
-  return { cycleStart, cycleEnd, isDay: data.isDay };
-}
-
-function validateWorldStateResponse(data: WorldStateResponse): { cycleStart: number; cycleEnd: number } | null {
-  const cetusMission = data.SyndicateMissions?.find(m => m.Tag === 'CetusSyndicate');
-  if (!cetusMission?.Activation?.$date?.$numberLong || !cetusMission?.Expiry?.$date?.$numberLong) {
-    return null;
-  }
-  const cycleStart = parseInt(cetusMission.Activation.$date.$numberLong, 10);
-  const cycleEnd = parseInt(cetusMission.Expiry.$date.$numberLong, 10);
-  if (!isValidTimestamp(cycleStart) || !isValidTimestamp(cycleEnd)) {
-    return null;
-  }
-  if (cycleEnd <= cycleStart) {
-    return null;
-  }
-  return { cycleStart, cycleEnd };
-}
-
-// Calculate current cycle state from a known reference timestamp
-function calculateFromReference(referenceStart: number): { cycleStart: number; cycleEnd: number; isDay: boolean } {
-  const now = Date.now();
-  const timeSinceReference = now - referenceStart;
-  const cyclePos = ((timeSinceReference % CETUS_CYCLE_MS) + CETUS_CYCLE_MS) % CETUS_CYCLE_MS;
-
-  const currentCycleStart = now - cyclePos;
-  const currentCycleEnd = currentCycleStart + CETUS_CYCLE_MS;
-  const isDay = cyclePos < CETUS_DAY_MS;
-
-  return { cycleStart: currentCycleStart, cycleEnd: currentCycleEnd, isDay };
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const process: { env: Record<string, string | undefined> };
 
 export async function GET() {
-  const startTime = Date.now();
-  const errors: string[] = [];
+  // #region agent log H1
+  // Hypothesis 1: Check if EDGE_CONFIG env var exists
+  const edgeConfigEnv = process.env.EDGE_CONFIG;
+  fetch('http://127.0.0.1:7242/ingest/22ed322e-28b1-4acf-95e2-dd511b155c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:H1',message:'EDGE_CONFIG env var',data:{exists:!!edgeConfigEnv,value:edgeConfigEnv?.substring(0,50),length:edgeConfigEnv?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
 
-  // 1. Try Vercel Edge Config first (synced by GitHub Action every 6 hours)
+  // #region agent log H2
+  // Hypothesis 2: Check format of connection string
+  const hasToken = edgeConfigEnv?.includes('token=');
+  const hasEdgeConfigDomain = edgeConfigEnv?.includes('edge-config.vercel.com');
+  const hasEcfgId = edgeConfigEnv?.includes('ecfg_');
+  fetch('http://127.0.0.1:7242/ingest/22ed322e-28b1-4acf-95e2-dd511b155c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:H2',message:'Connection string format',data:{hasToken,hasEdgeConfigDomain,hasEcfgId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+
+  // #region agent log H3-H5
+  // Hypothesis 3-5: Try to call SDK get() and capture result/error
+  let sdkResult: unknown = null;
+  let sdkError: string | null = null;
   try {
-    const edgeConfigResponse = await fetch(EDGE_CONFIG_URL);
-    if (!edgeConfigResponse.ok) {
-      throw new Error(`Edge Config fetch failed: ${edgeConfigResponse.status}`);
-    }
-    const edgeConfigData = await edgeConfigResponse.json() as { cetus_cycle_start?: number; cetus_synced_at?: number };
-    const edgeConfigStart = edgeConfigData.cetus_cycle_start;
-    const edgeConfigSyncedAt = edgeConfigData.cetus_synced_at;
-
-    if (edgeConfigStart && isValidTimestamp(edgeConfigStart)) {
-      // Edge Config has valid data - use it as reference for calculation
-      const calculated = calculateFromReference(edgeConfigStart);
-      const syncAge = edgeConfigSyncedAt ? Date.now() - edgeConfigSyncedAt : null;
-
-      return Response.json({
-        cycleStart: calculated.cycleStart,
-        cycleEnd: calculated.cycleEnd,
-        isDay: calculated.isDay,
-        fetchedAt: Date.now(),
-        source: 'edge-config',
-        syncedAt: edgeConfigSyncedAt,
-        syncAgeMs: syncAge,
-        responseTime: Date.now() - startTime,
-      });
-    }
-  } catch (error) {
-    // Edge Config not configured or failed - continue to other sources
-    errors.push(`edge-config: ${error instanceof Error ? error.message : 'not configured'}`);
+    sdkResult = await get<number>('cetus_cycle_start');
+    fetch('http://127.0.0.1:7242/ingest/22ed322e-28b1-4acf-95e2-dd511b155c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:H3-success',message:'SDK get() succeeded',data:{result:sdkResult,type:typeof sdkResult},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+  } catch (err) {
+    sdkError = err instanceof Error ? err.message : String(err);
+    fetch('http://127.0.0.1:7242/ingest/22ed322e-28b1-4acf-95e2-dd511b155c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:H3-error',message:'SDK get() threw error',data:{error:sdkError,errorType:err?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
   }
+  // #endregion
 
-  // 2. Try warframestat.us community API (CORS-friendly, designed for apps)
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch('https://api.warframestat.us/pc/cetusCycle', {
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    clearTimeout(timeout);
-    const responseTime = Date.now() - startTime;
-
-    if (response.ok) {
-      const data: WarframeStatCetusResponse = await response.json();
-      const validated = validateWarframeStatResponse(data);
-
-      if (validated) {
-        return Response.json({
-          cycleStart: validated.cycleStart,
-          cycleEnd: validated.cycleEnd,
-          isDay: validated.isDay,
-          fetchedAt: Date.now(),
-          source: 'warframestat',
-          responseTime,
-        });
-      }
-      errors.push(`warframestat: invalid data - ${JSON.stringify(data).slice(0, 100)}`);
-    } else {
-      errors.push(`warframestat: HTTP ${response.status}`);
-    }
-  } catch (error) {
-    errors.push(`warframestat: ${error instanceof Error ? error.message : 'unknown error'}`);
-  }
-
-  // 3. Try official Warframe API (blocked from cloud providers, works locally)
-  try {
-    const apiStartTime = Date.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    clearTimeout(timeout);
-    const responseTime = Date.now() - apiStartTime;
-
-    if (response.ok) {
-      const data: WorldStateResponse = await response.json();
-      const validated = validateWorldStateResponse(data);
-
-      if (validated) {
-        const now = Date.now();
-        const elapsed = now - validated.cycleStart;
-        const isDay = elapsed < CETUS_DAY_MS;
-
-        return Response.json({
-          cycleStart: validated.cycleStart,
-          cycleEnd: validated.cycleEnd,
-          isDay,
-          fetchedAt: Date.now(),
-          source: 'warframe-api',
-          responseTime,
-        });
-      }
-      errors.push(`warframe-api: no CetusSyndicate in response`);
-    } else {
-      errors.push(`warframe-api: HTTP ${response.status}`);
-    }
-  } catch (error) {
-    errors.push(`warframe-api: ${error instanceof Error ? error.message : 'unknown error'}`);
-  }
-
-  // 4. All sources failed - use hardcoded fallback calculation
-  // Reference: Verified cycle start from Dec 13, 2025 API response
-  const FALLBACK_REFERENCE = 1765688923671;
-  const calculated = calculateFromReference(FALLBACK_REFERENCE);
-
+  // Return debug info directly
   return Response.json({
-    cycleStart: calculated.cycleStart,
-    cycleEnd: calculated.cycleEnd,
-    isDay: calculated.isDay,
-    fetchedAt: Date.now(),
-    source: 'calculated',
-    _debug: errors.length > 0 ? errors : undefined,
+    debug: true,
+    env: {
+      exists: !!edgeConfigEnv,
+      length: edgeConfigEnv?.length,
+      preview: edgeConfigEnv?.substring(0, 60),
+    },
+    sdk: {
+      result: sdkResult,
+      error: sdkError,
+    },
+    timestamp: Date.now(),
   });
 }
