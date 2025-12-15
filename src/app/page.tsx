@@ -3,11 +3,13 @@ import { Footer } from '@/components/footer';
 import { SpaceBackground } from '@/components/space-background';
 import { FloatingMenu } from '@/components/floating-menu';
 import { EarthGlobe } from '@/components/earth-globe';
+import { ScrollLock } from '@/components/scroll-lock';
 // import { AssetDebugger } from '@/components/asset-debugger';
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col relative" style={{ backgroundColor: '#000000' }}>
+    <main className="h-full w-full flex flex-col relative overflow-hidden" style={{ backgroundColor: '#000000' }}>
+      <ScrollLock />
       <SpaceBackground />
       <EarthGlobe />
       <FloatingMenu />

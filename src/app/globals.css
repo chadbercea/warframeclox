@@ -102,8 +102,28 @@
   * {
     @apply border-border;
   }
+  html,
   body {
     @apply bg-background text-foreground;
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    /* Prevent pull-to-refresh and overscroll on mobile */
+    overscroll-behavior: none;
+    /* Prevent touch actions that cause scroll - pan-x allows horizontal but blocks vertical scroll */
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  /* Allow interactive elements to be tappable */
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
 }
 
