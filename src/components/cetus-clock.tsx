@@ -50,7 +50,6 @@ export function CetusClock() {
   const [timeLeft, setTimeLeft] = useState('--:--');
   const [starburstRotation, setStarburstRotation] = useState(0);
   const [outerRingRotation, setOuterRingRotation] = useState(0);
-  const [cycleProgress, setCycleProgress] = useState(0); // 0-100 for day/night transition icon
   const animationRef = useRef<number | null>(null);
   const starburstRef = useRef<number | null>(null);
   const outerRingRef = useRef<number | null>(null);
@@ -92,7 +91,6 @@ export function CetusClock() {
     // Check for cycle transition and update time display
     const state = getCetusCycleState();
     setTimeLeft(state.timeLeftFormatted);
-    setCycleProgress(state.percentComplete);
 
     if (state.isDay !== isDay) {
       setIsDay(state.isDay);
@@ -466,7 +464,6 @@ export function CetusClock() {
           {[15, 45, 75, 105, 135, 165, 195, 225, 255, 285, 315, 345].map((angle) => {
             const rad = ((angle - 90) * Math.PI) / 180;
             const arcRadius = bgRadius * 1.72;
-            const arcLength = bgRadius * 0.15;
             const startX = bgCenter.x + arcRadius * Math.cos(rad - 0.08);
             const startY = bgCenter.y + arcRadius * Math.sin(rad - 0.08);
             const endX = bgCenter.x + arcRadius * Math.cos(rad + 0.08);
