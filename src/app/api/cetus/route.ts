@@ -1,10 +1,11 @@
 // Server-side API route for Cetus cycle data
 // Priority: Edge Config (synced by GitHub Action) → warframestat.us → Warframe API → calculated fallback
 
-import { get } from '@vercel/edge-config';
-
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+
+// Edge Config direct fetch (bypassing SDK which doesn't work in Edge Runtime)
+const EDGE_CONFIG_URL = 'https://edge-config.vercel.com/ecfg_i7wukxkcxmejcih7vtkpfcthms6b/items?token=5ca683c4-c71e-4c2c-b298-609191067e3b';
 
 // Response types for external APIs
 interface WarframeStatCetusResponse {
@@ -83,8 +84,13 @@ export async function GET() {
 
   // 1. Try Vercel Edge Config first (synced by GitHub Action every 6 hours)
   try {
-    const edgeConfigStart = await get<number>('cetus_cycle_start');
-    const edgeConfigSyncedAt = await get<number>('cetus_synced_at');
+    const edgeConfigResponse = await fetch(EDGE_CONFIG_URL);
+    if (!edgeConfigResponse.ok) {
+      throw new Error(`Edge Config fetch failed: ${edgeConfigResponse.status}`);
+    }
+    const edgeConfigData = await edgeConfigResponse.json() as { cetus_cycle_start?: number; cetus_synced_at?: number };
+    const edgeConfigStart = edgeConfigData.cetus_cycle_start;
+    const edgeConfigSyncedAt = edgeConfigData.cetus_synced_at;
 
     if (edgeConfigStart && isValidTimestamp(edgeConfigStart)) {
       // Edge Config has valid data - use it as reference for calculation
