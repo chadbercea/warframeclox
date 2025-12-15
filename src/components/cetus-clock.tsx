@@ -141,33 +141,43 @@ export function CetusClock() {
     };
   }, []);
 
-  // Responsive sizing - use visualViewport API for stable dimensions on mobile
+  // Responsive sizing - only update on actual device orientation/size changes, not URL bar
   useEffect(() => {
+    // Store initial dimensions to detect real size changes vs URL bar changes
+    let lastWidth = 0;
+    let lastHeight = 0;
+
     const updateSize = () => {
-      // Use visualViewport for stable dimensions that don't change with URL bar
-      const vw = window.visualViewport?.width ?? window.innerWidth;
-      const vh = window.visualViewport?.height ?? window.innerHeight;
-      const minDimension = Math.min(vw, vh);
-      setSize(minDimension * 0.8);
-      setViewportSize({ width: vw, height: vh });
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Only update if width changed (orientation) or height changed significantly (>100px)
+      // Small height changes are likely URL bar show/hide
+      const widthChanged = Math.abs(vw - lastWidth) > 10;
+      const heightChangedSignificantly = Math.abs(vh - lastHeight) > 100;
+
+      if (widthChanged || heightChangedSignificantly || lastWidth === 0) {
+        lastWidth = vw;
+        lastHeight = vh;
+        const minDimension = Math.min(vw, vh);
+        setSize(minDimension * 0.8);
+        setViewportSize({ width: vw, height: vh });
+      }
     };
 
     updateSize();
+    window.addEventListener('resize', updateSize);
 
-    // Listen to visualViewport resize for more stable updates on mobile
-    const viewport = window.visualViewport;
-    if (viewport) {
-      viewport.addEventListener('resize', updateSize);
-    } else {
-      window.addEventListener('resize', updateSize);
-    }
+    // Also handle orientation change explicitly
+    window.addEventListener('orientationchange', () => {
+      // Force update after orientation change
+      lastWidth = 0;
+      lastHeight = 0;
+      setTimeout(updateSize, 100);
+    });
 
     return () => {
-      if (viewport) {
-        viewport.removeEventListener('resize', updateSize);
-      } else {
-        window.removeEventListener('resize', updateSize);
-      }
+      window.removeEventListener('resize', updateSize);
     };
   }, []);
 
