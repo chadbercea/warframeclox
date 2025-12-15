@@ -1,52 +1,70 @@
 #!/bin/bash
-# Local sync script - run this from your machine to update Edge Config
-# Usage: ./scripts/sync-cetus.sh
+# Sync Cetus cycle data from Warframe API to Vercel Edge Config
+# Run this locally when you notice timer drift
 
 set -e
 
-echo "Fetching Cetus cycle from Warframe API..."
-RESPONSE=$(curl -sL "https://api.warframe.com/cdn/worldState.php")
-
-CETUS_DATA=$(echo "$RESPONSE" | jq -r '.SyndicateMissions[] | select(.Tag == "CetusSyndicate")')
-
-if [ -z "$CETUS_DATA" ]; then
-  echo "Failed to get Cetus data"
-  exit 1
+# Load token from .env.local if not set
+if [ -z "$VERCEL_ACCESS_TOKEN" ]; then
+  if [ -f ".env.local" ]; then
+    export $(grep VERCEL_ACCESS_TOKEN .env.local | xargs)
+  fi
 fi
-
-CYCLE_START=$(echo "$CETUS_DATA" | jq -r '.Activation."$date"."$numberLong"')
-CYCLE_END=$(echo "$CETUS_DATA" | jq -r '.Expiry."$date"."$numberLong"')
-SYNCED_AT=$(date +%s)000
-
-echo "Cetus cycle: start=$CYCLE_START, end=$CYCLE_END"
-
-# Get secrets from GitHub
-VERCEL_ACCESS_TOKEN=$(gh secret list -R chadbercea/warframeclox 2>/dev/null | grep -q VERCEL_ACCESS_TOKEN && echo "exists" || echo "")
 
 if [ -z "$VERCEL_ACCESS_TOKEN" ]; then
-  echo ""
-  echo "To update Edge Config, you need to set these environment variables:"
-  echo "  export VERCEL_ACCESS_TOKEN=<your-token>"
-  echo "  export EDGE_CONFIG_ID=ecfg_i7wukxkcxmejcih7vtkpfcthms6b"
-  echo "  export VERCEL_TEAM_ID=<your-team-id>"
-  echo ""
-  echo "Then run this script again."
+  echo "❌ VERCEL_ACCESS_TOKEN not set. Add it to .env.local or export it."
   exit 1
 fi
 
-echo "Updating Edge Config..."
-curl -X PATCH "https://api.vercel.com/v1/edge-config/$EDGE_CONFIG_ID/items?teamId=$VERCEL_TEAM_ID" \
+EDGE_CONFIG_ID="ecfg_i7wukxkcxmejcih7vtkpfcthms6b"
+
+echo "📡 Fetching Cetus data from Warframe API..."
+
+# Fetch and extract Cetus data
+RESPONSE=$(curl -sL "https://api.warframe.com/cdn/worldState.php")
+
+if [ -z "$RESPONSE" ]; then
+  echo "❌ Failed to fetch from Warframe API"
+  exit 1
+fi
+
+# Extract CetusSyndicate data using jq
+CETUS_DATA=$(echo "$RESPONSE" | jq -r '.SyndicateMissions[] | select(.Tag=="CetusSyndicate")')
+
+if [ -z "$CETUS_DATA" ]; then
+  echo "❌ Could not find CetusSyndicate in response"
+  exit 1
+fi
+
+ACTIVATION=$(echo "$CETUS_DATA" | jq -r '.Activation."$date"."$numberLong"')
+EXPIRY=$(echo "$CETUS_DATA" | jq -r '.Expiry."$date"."$numberLong"')
+SYNCED_AT=$(date +%s)000
+
+echo "✅ Cetus cycle data:"
+echo "   Activation: $ACTIVATION"
+echo "   Expiry:     $EXPIRY"
+echo "   Synced at:  $SYNCED_AT"
+
+echo ""
+echo "📤 Updating Edge Config..."
+
+RESULT=$(curl -s -X PATCH "https://api.vercel.com/v1/edge-config/$EDGE_CONFIG_ID/items" \
   -H "Authorization: Bearer $VERCEL_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
     \"items\": [
-      {\"operation\": \"upsert\", \"key\": \"cetus_start\", \"value\": $CYCLE_START},
-      {\"operation\": \"upsert\", \"key\": \"cetus_end\", \"value\": $CYCLE_END},
+      {\"operation\": \"upsert\", \"key\": \"cetus_start\", \"value\": $ACTIVATION},
+      {\"operation\": \"upsert\", \"key\": \"cetus_end\", \"value\": $EXPIRY},
       {\"operation\": \"upsert\", \"key\": \"synced_at\", \"value\": $SYNCED_AT}
     ]
-  }"
+  }")
 
-echo ""
-echo "Done! Edge Config updated."
-
-
+if echo "$RESULT" | grep -q '"status":"ok"'; then
+  echo "✅ Edge Config updated successfully!"
+  echo ""
+  echo "🔄 Verify at: https://warframeclox.vercel.app/api/cetus"
+else
+  echo "❌ Failed to update Edge Config:"
+  echo "$RESULT"
+  exit 1
+fi
