@@ -25,6 +25,8 @@ function getTodayString(): string {
 
 // POST: Accept sync data from client browsers (residential IPs)
 export async function POST(request: NextRequest) {
+  const logPrefix = `[sync-cetus ${new Date().toISOString()}]`;
+  
   try {
     const body = await request.json();
     const { activation, expiry } = body;
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
     const currentUnchangedCount = isNewDay ? 0 : unchangedCount;
 
     if (!isNewDay && currentUnchangedCount >= MAX_UNCHANGED_ATTEMPTS) {
+      console.log(`${logPrefix} BLOCKED - Daily limit reached (${currentUnchangedCount}/${MAX_UNCHANGED_ATTEMPTS})`);
       return Response.json({ 
         success: true, 
         action: 'skipped',
@@ -107,6 +110,7 @@ export async function POST(request: NextRequest) {
         }
       );
 
+      console.log(`${logPrefix} UNCHANGED - count: ${newUnchangedCount}/${MAX_UNCHANGED_ATTEMPTS}, activation: ${activationTs}`);
       return Response.json({ 
         success: true, 
         action: 'skipped',
@@ -138,12 +142,14 @@ export async function POST(request: NextRequest) {
     );
 
     if (!updateResponse.ok) {
+      console.log(`${logPrefix} ERROR - Edge Config update failed`);
       return Response.json({ 
         success: false, 
         error: 'Failed to update storage' 
       }, { status: 500 });
     }
 
+    console.log(`${logPrefix} UPDATED - activation: ${activationTs}, expiry: ${expiryTs}`);
     return Response.json({
       success: true,
       action: 'updated',
@@ -156,6 +162,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`[sync-cetus ${new Date().toISOString()}] ERROR - ${errorMessage}`);
     return Response.json({
       success: false,
       error: errorMessage,
