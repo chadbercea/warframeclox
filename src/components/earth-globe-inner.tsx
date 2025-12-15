@@ -202,7 +202,7 @@ export default function EarthGlobeInner({
       className="fixed bottom-0 left-0 right-0 pointer-events-none"
       style={{
         width: '100%',
-        height: '100vh',
+        height: '100dvh',
         zIndex: 0,
       }}
     />

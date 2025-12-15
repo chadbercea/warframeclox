@@ -141,19 +141,34 @@ export function CetusClock() {
     };
   }, []);
 
-  // Responsive sizing
+  // Responsive sizing - use visualViewport API for stable dimensions on mobile
   useEffect(() => {
     const updateSize = () => {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+      // Use visualViewport for stable dimensions that don't change with URL bar
+      const vw = window.visualViewport?.width ?? window.innerWidth;
+      const vh = window.visualViewport?.height ?? window.innerHeight;
       const minDimension = Math.min(vw, vh);
       setSize(minDimension * 0.8);
       setViewportSize({ width: vw, height: vh });
     };
 
     updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+
+    // Listen to visualViewport resize for more stable updates on mobile
+    const viewport = window.visualViewport;
+    if (viewport) {
+      viewport.addEventListener('resize', updateSize);
+    } else {
+      window.addEventListener('resize', updateSize);
+    }
+
+    return () => {
+      if (viewport) {
+        viewport.removeEventListener('resize', updateSize);
+      } else {
+        window.removeEventListener('resize', updateSize);
+      }
+    };
   }, []);
 
   if (size === 0) return null;
