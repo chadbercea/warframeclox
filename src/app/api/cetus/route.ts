@@ -3,7 +3,7 @@
 
 import { createClient } from '@vercel/edge-config';
 
-const edgeConfig = createClient(process.env.EDGE_CONFIG || 'https://edge-config.vercel.com/ecfg_i7wukxkcxmejcih7vtkpfcthms6b?token=5ca683c4-c71e-4c2c-b298-609191067e3b');
+const edgeConfig = createClient(process.env.EDGE_CONFIG?.trim() || 'https://edge-config.vercel.com/ecfg_i7wukxkcxmejcih7vtkpfcthms6b?token=5ca683c4-c71e-4c2c-b298-609191067e3b');
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
