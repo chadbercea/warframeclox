@@ -199,10 +199,10 @@ export default function EarthGlobeInner({
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-0 left-0 right-0 pointer-events-none"
+      className="fixed inset-0 pointer-events-none"
       style={{
         width: '100%',
-        height: '100dvh',
+        height: '100%',
         zIndex: 0,
       }}
     />
