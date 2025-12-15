@@ -1029,7 +1029,7 @@ export function CetusClock() {
                   transition: {
                     delay: i * 0.04,
                     duration: 0.25,
-                    ease: 'easeOut',
+                    ease: 'easeOut' as const,
                   },
                 }),
                 exit: (i: number) => ({
@@ -1038,7 +1038,7 @@ export function CetusClock() {
                   transition: {
                     delay: (7 - i) * 0.03,
                     duration: 0.2,
-                    ease: 'easeIn',
+                    ease: 'easeIn' as const,
                   },
                 }),
               };
@@ -1049,12 +1049,12 @@ export function CetusClock() {
                 animate: {
                   scale: 1,
                   opacity: 1,
-                  transition: { duration: 0.3, ease: 'easeOut' },
+                  transition: { duration: 0.3, ease: 'easeOut' as const },
                 },
                 exit: {
                   scale: 0.8,
                   opacity: 0,
-                  transition: { duration: 0.25, ease: 'easeIn' },
+                  transition: { duration: 0.25, ease: 'easeIn' as const },
                 },
               };
 
@@ -1065,13 +1065,13 @@ export function CetusClock() {
                   scale: 1,
                   opacity: 1,
                   rotate: 0,
-                  transition: { duration: 0.4, ease: 'easeOut', delay: 0.1 },
+                  transition: { duration: 0.4, ease: 'easeOut' as const, delay: 0.1 },
                 },
                 exit: {
                   scale: 0.6,
                   opacity: 0,
                   rotate: 30,
-                  transition: { duration: 0.3, ease: 'easeIn' },
+                  transition: { duration: 0.3, ease: 'easeIn' as const },
                 },
               };
 
