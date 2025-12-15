@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic';
 
 const EDGE_CONFIG_ID = 'ecfg_i7wukxkcxmejcih7vtkpfcthms6b';
 
-// Minimum time between updates (5 minutes) - prevents spam
-const MIN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
+// Max unchanged attempts before stopping for the day
+const MAX_UNCHANGED_ATTEMPTS = 3;
 
 // Validate timestamp is reasonable (not too old, not too far in the future)
 function isValidTimestamp(ts: number, allowFuture: boolean = false): boolean {
@@ -16,6 +16,11 @@ function isValidTimestamp(ts: number, allowFuture: boolean = false): boolean {
   // Expiry can be up to 3 hours in the future (cycle is 2.5 hours)
   const maxFuture = allowFuture ? now + 3 * 60 * 60 * 1000 : now + 60 * 60 * 1000;
   return ts > oneYearAgo && ts < maxFuture;
+}
+
+// Get today's date as YYYY-MM-DD string
+function getTodayString(): string {
+  return new Date().toISOString().split('T')[0];
 }
 
 // POST: Accept sync data from client browsers (residential IPs)
@@ -53,30 +58,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Check current stored data
-    const currentSyncedAt = await get<number>('synced_at');
     const currentStart = await get<number>('cetus_start');
+    const syncDate = await get<string>('sync_date');
+    const unchangedCount = await get<number>('sync_unchanged_count') || 0;
     const now = Date.now();
+    const today = getTodayString();
 
-    // Skip if we synced recently (within MIN_UPDATE_INTERVAL_MS)
-    if (currentSyncedAt && (now - currentSyncedAt) < MIN_UPDATE_INTERVAL_MS) {
+    // Check if we've hit the daily limit of unchanged attempts
+    const isNewDay = syncDate !== today;
+    const currentUnchangedCount = isNewDay ? 0 : unchangedCount;
+
+    if (!isNewDay && currentUnchangedCount >= MAX_UNCHANGED_ATTEMPTS) {
       return Response.json({ 
         success: true, 
         action: 'skipped',
-        reason: 'Recently synced',
-        lastSync: currentSyncedAt
+        reason: `Daily limit reached (${MAX_UNCHANGED_ATTEMPTS} unchanged syncs)`,
+        unchangedCount: currentUnchangedCount
       });
     }
 
-    // Skip if data is the same (same activation timestamp)
-    if (currentStart === activationTs) {
-      return Response.json({ 
-        success: true, 
-        action: 'skipped',
-        reason: 'Data unchanged'
-      });
-    }
-
-    // Update Edge Config with new data
     const vercelToken = process.env.VERCEL_ACCESS_TOKEN;
     if (!vercelToken) {
       return Response.json({ 
@@ -85,6 +85,38 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // Check if data is the same (same activation timestamp)
+    if (currentStart === activationTs) {
+      // Data unchanged - increment counter
+      const newUnchangedCount = currentUnchangedCount + 1;
+      
+      await fetch(
+        `https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${vercelToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            items: [
+              { operation: 'upsert', key: 'sync_date', value: today },
+              { operation: 'upsert', key: 'sync_unchanged_count', value: newUnchangedCount },
+            ],
+          }),
+        }
+      );
+
+      return Response.json({ 
+        success: true, 
+        action: 'skipped',
+        reason: 'Data unchanged',
+        unchangedCount: newUnchangedCount,
+        remainingAttempts: MAX_UNCHANGED_ATTEMPTS - newUnchangedCount
+      });
+    }
+
+    // Data is different - update everything and reset counter
     const updateResponse = await fetch(
       `https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`,
       {
@@ -98,6 +130,8 @@ export async function POST(request: NextRequest) {
             { operation: 'upsert', key: 'cetus_start', value: activationTs },
             { operation: 'upsert', key: 'cetus_end', value: expiryTs },
             { operation: 'upsert', key: 'synced_at', value: now },
+            { operation: 'upsert', key: 'sync_date', value: today },
+            { operation: 'upsert', key: 'sync_unchanged_count', value: 0 },
           ],
         }),
       }
