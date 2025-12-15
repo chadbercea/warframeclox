@@ -13,18 +13,22 @@ jobs:
       - name: Fetch Cetus cycle from Warframe API
         id: fetch
         run: |
-          RESPONSE=$(curl -sL "https://api.warframe.com/cdn/worldState.php")
+          # Use warframestat.us API (community API that works from cloud)
+          RESPONSE=$(curl -sL "https://api.warframestat.us/pc/cetusCycle")
           
-          CETUS_DATA=$(echo "$RESPONSE" | jq -r '.SyndicateMissions[] | select(.Tag == "CetusSyndicate")')
+          echo "Response: $RESPONSE"
           
-          if [ -z "$CETUS_DATA" ]; then
-            echo "Failed to get Cetus data"
-            echo "$RESPONSE" | head -c 500
+          ACTIVATION=$(echo "$RESPONSE" | jq -r '.activation')
+          EXPIRY=$(echo "$RESPONSE" | jq -r '.expiry')
+          
+          if [ "$ACTIVATION" == "null" ] || [ -z "$ACTIVATION" ]; then
+            echo "Failed to get Cetus data from warframestat.us"
             exit 1
           fi
 
-          CYCLE_START=$(echo "$CETUS_DATA" | jq -r '.Activation."$date"."$numberLong"')
-          CYCLE_END=$(echo "$CETUS_DATA" | jq -r '.Expiry."$date"."$numberLong"')
+          # Convert ISO dates to timestamps
+          CYCLE_START=$(date -d "$ACTIVATION" +%s)000
+          CYCLE_END=$(date -d "$EXPIRY" +%s)000
 
           echo "cycle_start=$CYCLE_START" >> $GITHUB_OUTPUT
           echo "cycle_end=$CYCLE_END" >> $GITHUB_OUTPUT
