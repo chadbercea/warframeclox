@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "rm -rf .next && npm run build"
+  "buildCommand": "rm -rf .next && npm run build",
+  "crons": [
+    {
+      "path": "/api/sync-cetus",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }

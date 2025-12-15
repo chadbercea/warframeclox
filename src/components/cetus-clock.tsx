@@ -1027,10 +1027,10 @@ export function CetusClock() {
               const fillProgress = cycleProgress / 100; // 0 to 1
               const fillWidth512 = fillProgress * 512;
 
-              // Ring and rays opacity: visible during day, fade as night comes
-              // Day: 1 -> 0 as progress increases
-              // Night: 0 -> 1 as progress increases
-              const sunElementsOpacity = isDay ? (1 - fillProgress) : fillProgress;
+              // Ring and rays opacity: visible during day, hidden during night
+              // Day: sun with ring and rays
+              // Night: just the circle (moon) - no ring/rays
+              const sunElementsOpacity = isDay ? 1 : 0;
 
               return (
                 <svg
