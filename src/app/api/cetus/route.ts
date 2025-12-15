@@ -3,7 +3,7 @@
 
 import { get } from '@vercel/edge-config';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 // Response types for external APIs
