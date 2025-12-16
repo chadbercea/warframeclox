@@ -261,18 +261,14 @@ export function FloatingMenu() {
           {/* App Title */}
           <div className="mb-3 pb-3 border-b w-full" style={{ borderColor: 'rgba(201, 169, 97, 0.3)' }}>
             <h1
-              className="text-xl whitespace-nowrap"
+              className="text-xl whitespace-nowrap text-center"
               style={{
                 fontFamily: FONTS.ailerons,
                 color: COLORS.goldPrimary,
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
+                letterSpacing: '0.02em',
               }}
             >
-              {'WARFRAME CLOX'.split('').map((char, i) => (
-                <span key={i} style={{ display: 'inline-block' }}>{char === ' ' ? '\u00A0' : char}</span>
-              ))}
+              WARFRAME CLOX
             </h1>
           </div>
 
