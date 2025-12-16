@@ -135,12 +135,20 @@ export default function EarthGlobeInner({
 
     let lastIsDay: boolean | null = null;
 
+    // Check if we should spin the globe (disabled on mobile for performance)
+    const MOBILE_BREAKPOINT = 768;
+    const shouldSpin = () => window.innerWidth >= MOBILE_BREAKPOINT;
+
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
 
       const state = getCetusCycleState();
-      earthGroup.rotation.y += 0.0005;
+
+      // Only spin the globe on larger screens
+      if (shouldSpin()) {
+        earthGroup.rotation.y += 0.0005;
+      }
 
       const progress = state.percentComplete / 100;
       let sunAngle: number;
