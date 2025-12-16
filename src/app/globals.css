@@ -178,3 +178,39 @@
   background-repeat: repeat;
   background-size: 256px 256px;
 }
+
+/* ========================================
+ * Orokin Scrollbar Styling
+ * ======================================== */
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+.orokin-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.orokin-scroll::-webkit-scrollbar-track {
+  background: rgba(201, 169, 97, 0.08);
+  border-left: 1px solid rgba(201, 169, 97, 0.2);
+}
+
+.orokin-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+    rgba(201, 169, 97, 0.6) 0%,
+    rgba(201, 169, 97, 0.4) 50%,
+    rgba(201, 169, 97, 0.6) 100%
+  );
+  border-left: 1px solid rgba(201, 169, 97, 0.3);
+}
+
+.orokin-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+    rgba(201, 169, 97, 0.8) 0%,
+    rgba(201, 169, 97, 0.6) 50%,
+    rgba(201, 169, 97, 0.8) 100%
+  );
+}
+
+.orokin-scroll::-webkit-scrollbar-corner {
+  background: rgba(201, 169, 97, 0.08);
+}
