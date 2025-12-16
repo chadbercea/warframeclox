@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 // Sound file paths
 const SOUNDS = {
@@ -16,56 +16,77 @@ const playingState: Record<string, boolean> = {};
 
 const STORAGE_KEY = 'warframeclox_sound_enabled';
 
+// Shared audio elements across all hook instances
+let sharedAudioRefs: Map<SoundName, HTMLAudioElement> | null = null;
+let audioInitialized = false;
+
+// Shared state management for sound enabled across all hook instances
+let soundEnabled = true; // Default to true
+const listeners: Set<() => void> = new Set();
+
+function notifyListeners() {
+  listeners.forEach((listener) => listener());
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot() {
+  return soundEnabled;
+}
+
+function getServerSnapshot() {
+  return true; // Default for SSR
+}
+
+function initializeFromStorage() {
+  if (typeof window === 'undefined') return;
+  const savedPreference = localStorage.getItem(STORAGE_KEY);
+  soundEnabled = savedPreference === null ? true : savedPreference === 'true';
+}
+
 export function useSound() {
-  const [isEnabled, setIsEnabled] = useState(false);
-  const audioRefs = useRef<Map<SoundName, HTMLAudioElement>>(new Map());
+  // Use useSyncExternalStore for shared state across all hook instances
+  const isEnabled = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  // Initialize from localStorage on mount
+  // Initialize from localStorage on first mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const savedPreference = localStorage.getItem(STORAGE_KEY);
-    // Default to true if no preference saved
-    setIsEnabled(savedPreference === null ? true : savedPreference === 'true');
-  }, []);
+    // Initialize shared state from localStorage (only once)
+    initializeFromStorage();
+    notifyListeners();
 
-  // Preload audio files on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    Object.entries(SOUNDS).forEach(([name, path]) => {
-      const audio = new Audio(path);
-      audio.preload = 'auto';
-      audioRefs.current.set(name as SoundName, audio);
-    });
-
-    return () => {
-      audioRefs.current.forEach((audio) => {
-        audio.pause();
-        audio.src = '';
+    // Initialize shared audio elements (only once)
+    if (!audioInitialized) {
+      sharedAudioRefs = new Map();
+      Object.entries(SOUNDS).forEach(([name, path]) => {
+        const audio = new Audio(path);
+        audio.preload = 'auto';
+        sharedAudioRefs!.set(name as SoundName, audio);
       });
-      audioRefs.current.clear();
-    };
+      audioInitialized = true;
+    }
   }, []);
 
   const toggleSound = useCallback(() => {
-    setIsEnabled((prev) => {
-      const newState = !prev;
-      localStorage.setItem(STORAGE_KEY, String(newState));
-      return newState;
-    });
+    soundEnabled = !soundEnabled;
+    localStorage.setItem(STORAGE_KEY, String(soundEnabled));
+    notifyListeners();
   }, []);
 
-  const playSound = useCallback((name: SoundName, force = false) => {
+  const playSound = useCallback((name: SoundName) => {
     if (typeof window === 'undefined') return;
 
-    // Check if sound is enabled (unless forced for UI sounds like menu)
-    if (!force && !isEnabled) return;
+    // Check if sound is enabled - read directly from shared state
+    if (!soundEnabled) return;
 
     // Prevent overlapping playback of the same sound
     if (playingState[name]) return;
 
-    const audio = audioRefs.current.get(name);
+    const audio = sharedAudioRefs?.get(name);
     if (!audio) return;
 
     playingState[name] = true;
@@ -85,7 +106,7 @@ export function useSound() {
       audio.removeEventListener('ended', handleEnded);
     };
     audio.addEventListener('ended', handleEnded);
-  }, [isEnabled]);
+  }, []);
 
   return { playSound, isEnabled, toggleSound };
 }
