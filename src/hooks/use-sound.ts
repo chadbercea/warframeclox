@@ -21,7 +21,7 @@ let sharedAudioRefs: Map<SoundName, HTMLAudioElement> | null = null;
 let audioInitialized = false;
 
 // Shared state management for sound enabled across all hook instances
-let soundEnabled = true; // Default to true
+let soundEnabled = false; // Default to false
 const listeners: Set<() => void> = new Set();
 
 function notifyListeners() {
@@ -38,13 +38,13 @@ function getSnapshot() {
 }
 
 function getServerSnapshot() {
-  return true; // Default for SSR
+  return false; // Default for SSR
 }
 
 function initializeFromStorage() {
   if (typeof window === 'undefined') return;
   const savedPreference = localStorage.getItem(STORAGE_KEY);
-  soundEnabled = savedPreference === null ? true : savedPreference === 'true';
+  soundEnabled = savedPreference === 'true'; // Default to false if not set
 }
 
 // Initialize audio elements immediately when module loads (client-side only)
