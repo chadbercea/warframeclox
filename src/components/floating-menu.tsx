@@ -329,13 +329,13 @@ export function FloatingMenu() {
               <div
                 className="w-9 h-5 rounded-full relative transition-colors duration-200"
                 style={{
-                  backgroundColor: notificationsEnabled ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
+                  backgroundColor: notificationsEnabled ? COLORS.goldPrimary : 'rgba(100, 100, 100, 0.3)',
                 }}
               >
                 <div
                   className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
                   style={{
-                    backgroundColor: notificationsEnabled ? '#0a0a0c' : COLORS.goldPrimary,
+                    backgroundColor: notificationsEnabled ? '#0a0a0c' : 'rgba(150, 150, 150, 0.8)',
                     transform: notificationsEnabled ? 'translateX(18px)' : 'translateX(2px)',
                   }}
                 />
@@ -396,13 +396,13 @@ export function FloatingMenu() {
             <div
               className="w-9 h-5 rounded-full relative transition-colors duration-200"
               style={{
-                backgroundColor: soundEnabled ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
+                backgroundColor: soundEnabled ? COLORS.goldPrimary : 'rgba(100, 100, 100, 0.3)',
               }}
             >
               <div
                 className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
                 style={{
-                  backgroundColor: soundEnabled ? '#0a0a0c' : COLORS.goldPrimary,
+                  backgroundColor: soundEnabled ? '#0a0a0c' : 'rgba(150, 150, 150, 0.8)',
                   transform: soundEnabled ? 'translateX(18px)' : 'translateX(2px)',
                 }}
               />
@@ -468,13 +468,13 @@ export function FloatingMenu() {
             <div
               className="w-9 h-5 rounded-full relative transition-colors duration-200"
               style={{
-                backgroundColor: isFullscreen ? COLORS.goldPrimary : 'rgba(201, 169, 97, 0.2)',
+                backgroundColor: isFullscreen ? COLORS.goldPrimary : 'rgba(100, 100, 100, 0.3)',
               }}
             >
               <div
                 className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
                 style={{
-                  backgroundColor: isFullscreen ? '#0a0a0c' : COLORS.goldPrimary,
+                  backgroundColor: isFullscreen ? '#0a0a0c' : 'rgba(150, 150, 150, 0.8)',
                   transform: isFullscreen ? 'translateX(18px)' : 'translateX(2px)',
                 }}
               />
