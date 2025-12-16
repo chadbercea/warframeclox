@@ -114,7 +114,7 @@ async function submitSyncToServer(cycleStart: number, cycleEnd: number): Promise
   }
 }
 
-// Fetch DIRECTLY from Warframe API in the browser (bypasses cloud IP blocks)
+// Fetch Warframe API via proxy (avoids CORS/Origin header blocking)
 async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
   if (typeof window === 'undefined') return null; // Only run client-side
 
@@ -122,8 +122,8 @@ async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycle
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    // Try the CDN endpoint first (more reliable)
-    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
+    // Proxy strips Origin header - direct fetch gets blocked by Cloudflare
+    const response = await fetch('/proxy/warframe/worldState.php', {
       signal: controller.signal,
       cache: 'no-store',
     });
@@ -140,16 +140,16 @@ async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycle
 
       // Validate timestamps
       if (cycleStart > 1577836800000 && cycleEnd > cycleStart) {
-        console.log('[Cetus] Direct API fetch successful:', { cycleStart, cycleEnd });
-        
+        console.log('[Cetus] API fetch successful:', { cycleStart, cycleEnd });
+
         // Submit to server to update Edge Config for all users
         submitSyncToServer(cycleStart, cycleEnd);
-        
+
         return { cycleStart, cycleEnd };
       }
     }
-  } catch (error) {
-    console.log('[Cetus] Direct API fetch failed (expected on some networks):', error);
+  } catch {
+    // Expected to fail (CORS/blocked) - silently fall back to Edge Config
   }
   return null;
 }

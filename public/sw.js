@@ -51,7 +51,8 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) {
         // Fetch in background to update cache
         fetch(event.request).then((response) => {
-          if (response.ok) {
+          // Only cache full responses (not 206 partial)
+          if (response.ok && response.status !== 206) {
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, response);
             });
@@ -63,8 +64,8 @@ self.addEventListener('fetch', (event) => {
 
       // Otherwise fetch from network
       return fetch(event.request).then((response) => {
-        // Don't cache non-ok responses
-        if (!response.ok) {
+        // Don't cache non-ok responses or partial responses (206)
+        if (!response.ok || response.status === 206) {
           return response;
         }
 

@@ -1,10 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "rm -rf .next && npm run build",
-  "crons": [
+  "protectionBypass": [
     {
-      "path": "/api/sync-cetus",
-      "schedule": "0 6 * * *"
+      "scope": "preview",
+      "path": "/manifest.json"
+    },
+    {
+      "scope": "preview",
+      "path": "/sw.js"
     }
   ]
 }
