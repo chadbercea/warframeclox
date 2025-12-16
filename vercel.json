@@ -1,14 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "rm -rf .next && npm run build",
-  "protectionBypass": [
-    {
-      "scope": "preview",
-      "path": "/manifest.json"
-    },
-    {
-      "scope": "preview",
-      "path": "/sw.js"
-    }
-  ]
+  "buildCommand": "rm -rf .next && npm run build"
 }

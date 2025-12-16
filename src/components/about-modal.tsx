@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSound } from '@/hooks/use-sound';
+import Link from 'next/link';
 
 // Color tokens matching the design system
 const COLORS = {
@@ -342,6 +343,77 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
                     or making guesses based on gut feeling, I built this clock to always
                     know exactly where we stand in the day/night cycle.
                   </p>
+                </section>
+
+                <OrokinDivider />
+
+                {/* Design System */}
+                <section className="mb-6">
+                  <OrokinSectionHeader>Design System</OrokinSectionHeader>
+                  <div className="pl-7">
+                    <Link
+                      href="/design-system"
+                      className="flex items-center gap-3 p-3 transition-all duration-200 group"
+                      style={{
+                        backgroundColor: 'rgba(201, 169, 97, 0.05)',
+                        border: `1px solid rgba(201, 169, 97, 0.3)`,
+                        boxShadow: '0 0 15px rgba(201, 169, 97, 0.1)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = COLORS.goldPrimary;
+                        e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.12)';
+                        e.currentTarget.style.boxShadow = '0 0 25px rgba(201, 169, 97, 0.25)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(201, 169, 97, 0.3)';
+                        e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.05)';
+                        e.currentTarget.style.boxShadow = '0 0 15px rgba(201, 169, 97, 0.1)';
+                      }}
+                    >
+                      {/* Orokin Glyph Icon */}
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={COLORS.goldPrimary}
+                        strokeWidth="1.5"
+                        className="flex-shrink-0"
+                      >
+                        <path d="M12 2 L22 12 L12 22 L2 12 Z" />
+                        <path d="M12 6 L18 12 L12 18 L6 12 Z" opacity="0.5" />
+                        <circle cx="12" cy="12" r="2" fill={COLORS.goldPrimary} stroke="none" />
+                      </svg>
+                      <div className="flex-1">
+                        <span
+                          className="text-sm block font-medium"
+                          style={{ fontFamily: FONTS.notoSans, color: COLORS.goldPrimary }}
+                        >
+                          Orokin Design System
+                        </span>
+                        <span
+                          className="text-xs opacity-60"
+                          style={{ fontFamily: FONTS.notoSans, color: '#e5e5e5' }}
+                        >
+                          Explore our UI components, color palette, typography, and animations
+                        </span>
+                      </div>
+                      {/* Arrow icon */}
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={COLORS.goldPrimary}
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="opacity-50 group-hover:opacity-100 transition-opacity"
+                      >
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  </div>
                 </section>
 
                 <OrokinDivider />
