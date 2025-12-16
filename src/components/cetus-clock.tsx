@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
 import { useMouseParallax } from '@/hooks/use-mouse-parallax';
+import { useSound } from '@/hooks/use-sound';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Color tokens - mapped from CSS custom properties
@@ -54,7 +55,10 @@ export function CetusClock() {
   const animationRef = useRef<number | null>(null);
   const starburstRef = useRef<number | null>(null);
   const outerRingRef = useRef<number | null>(null);
+  const prevIsDayRef = useRef<boolean | null>(null);
+  const hasInitializedRef = useRef(false);
   const parallax = useMouseParallax();
+  const { playSound } = useSound();
 
   // Sync with API and get cycle data
   useEffect(() => {
@@ -113,6 +117,23 @@ export function CetusClock() {
       }
     };
   }, [animate]);
+
+  // Play sound when cycle transitions from day to night or night to day
+  useEffect(() => {
+    // Skip if not yet initialized (prevents sound on initial page load)
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      prevIsDayRef.current = isDay;
+      return;
+    }
+
+    // Only play sound if there was a real transition
+    if (prevIsDayRef.current !== null && prevIsDayRef.current !== isDay) {
+      console.log('[CetusClock] Cycle transition detected:', prevIsDayRef.current ? 'day' : 'night', '->', isDay ? 'day' : 'night');
+      playSound('cycleTransition');
+    }
+    prevIsDayRef.current = isDay;
+  }, [isDay, playSound]);
 
   // Slow counter-clockwise starburst rotation (120 seconds per full rotation)
   useEffect(() => {
