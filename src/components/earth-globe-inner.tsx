@@ -135,19 +135,18 @@ export default function EarthGlobeInner({
 
     let lastIsDay: boolean | null = null;
 
-    // Check if we should spin the globe (disabled on mobile OS for performance)
-    // Mobile Chrome has vendor tags that desktop Chrome does not
+    // Check if mobile OS - disable spinning and throttle animation
     const isMobileOS = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const shouldSpin = !isMobileOS;
 
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
+    // On mobile: render once per second instead of 60fps
+    // On desktop: full 60fps animation with globe spin
+    let animationId: number | null = null;
 
+    const renderFrame = () => {
       const state = getCetusCycleState();
 
-      // Only spin the globe on desktop OS
-      if (shouldSpin) {
+      // Only spin the globe on desktop
+      if (!isMobileOS) {
         earthGroup.rotation.y += 0.0005;
       }
 
@@ -181,7 +180,19 @@ export default function EarthGlobeInner({
       renderer.render(scene, camera);
     };
 
-    animate();
+    if (isMobileOS) {
+      // Mobile: render once immediately, then update every second
+      renderFrame();
+      const intervalId = setInterval(renderFrame, 1000);
+      sceneRef.current.animationId = intervalId as unknown as number;
+    } else {
+      // Desktop: full 60fps animation loop
+      const animate = () => {
+        animationId = requestAnimationFrame(animate);
+        renderFrame();
+      };
+      animate();
+    }
 
     // Resize handler
     const handleResize = () => {
@@ -197,6 +208,11 @@ export default function EarthGlobeInner({
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      if (isMobileOS && sceneRef.current?.animationId) {
+        clearInterval(sceneRef.current.animationId);
+      } else if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
       if (sceneRef.current) {
         sceneRef.current.renderer.dispose();
         container.removeChild(sceneRef.current.renderer.domElement);
