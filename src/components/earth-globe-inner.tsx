@@ -135,10 +135,10 @@ export default function EarthGlobeInner({
 
     let lastIsDay: boolean | null = null;
 
-    // Check if we should spin the globe (disabled on touch devices for performance)
-    // Use touch detection instead of screen width - catches high-res phones like S23 Ultra
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const shouldSpin = !isTouchDevice;
+    // Check if we should spin the globe (disabled on mobile OS for performance)
+    // Mobile Chrome has vendor tags that desktop Chrome does not
+    const isMobileOS = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const shouldSpin = !isMobileOS;
 
     // Animation loop
     const animate = () => {
@@ -146,7 +146,7 @@ export default function EarthGlobeInner({
 
       const state = getCetusCycleState();
 
-      // Only spin the globe on non-touch devices
+      // Only spin the globe on desktop OS
       if (shouldSpin) {
         earthGroup.rotation.y += 0.0005;
       }
