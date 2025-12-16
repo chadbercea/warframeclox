@@ -248,10 +248,13 @@ export function FloatingMenu() {
           {/* App Title */}
           <div className="mb-3 pb-3 border-b w-full" style={{ borderColor: 'rgba(201, 169, 97, 0.3)' }}>
             <h1
-              className="text-2xl tracking-wider w-full whitespace-nowrap"
+              className="text-2xl whitespace-nowrap"
               style={{
                 fontFamily: FONTS.ailerons,
                 color: COLORS.goldPrimary,
+                width: '100%',
+                textAlign: 'justify',
+                textAlignLast: 'justify',
               }}
             >
               WARFRAME CLOX
