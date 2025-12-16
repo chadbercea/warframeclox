@@ -47,11 +47,25 @@ function initializeFromStorage() {
   soundEnabled = savedPreference === null ? true : savedPreference === 'true';
 }
 
+// Initialize audio elements immediately when module loads (client-side only)
+function initializeAudio() {
+  if (typeof window === 'undefined') return;
+  if (audioInitialized) return;
+
+  sharedAudioRefs = new Map();
+  Object.entries(SOUNDS).forEach(([name, path]) => {
+    const audio = new Audio(path);
+    audio.preload = 'auto';
+    sharedAudioRefs!.set(name as SoundName, audio);
+  });
+  audioInitialized = true;
+}
+
 export function useSound() {
   // Use useSyncExternalStore for shared state across all hook instances
   const isEnabled = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  // Initialize from localStorage on first mount
+  // Initialize audio and localStorage on first mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -59,16 +73,8 @@ export function useSound() {
     initializeFromStorage();
     notifyListeners();
 
-    // Initialize shared audio elements (only once)
-    if (!audioInitialized) {
-      sharedAudioRefs = new Map();
-      Object.entries(SOUNDS).forEach(([name, path]) => {
-        const audio = new Audio(path);
-        audio.preload = 'auto';
-        sharedAudioRefs!.set(name as SoundName, audio);
-      });
-      audioInitialized = true;
-    }
+    // Initialize audio elements
+    initializeAudio();
   }, []);
 
   const toggleSound = useCallback(() => {
@@ -81,13 +87,27 @@ export function useSound() {
     if (typeof window === 'undefined') return;
 
     // Check if sound is enabled - read directly from shared state
-    if (!soundEnabled) return;
+    if (!soundEnabled) {
+      console.log(`[Sound] Sound disabled, not playing ${name}`);
+      return;
+    }
+
+    // Ensure audio is initialized
+    initializeAudio();
 
     // Prevent overlapping playback of the same sound
-    if (playingState[name]) return;
+    if (playingState[name]) {
+      console.log(`[Sound] Already playing ${name}, skipping`);
+      return;
+    }
 
     const audio = sharedAudioRefs?.get(name);
-    if (!audio) return;
+    if (!audio) {
+      console.log(`[Sound] No audio element for ${name}`);
+      return;
+    }
+
+    console.log(`[Sound] Playing ${name}`);
 
     playingState[name] = true;
 
