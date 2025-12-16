@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ServiceWorkerProvider } from "@/components/service-worker-provider";
+import { ToastProvider } from "@/contexts/toast-context";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -102,7 +103,9 @@ export default function RootLayout({
         style={{ overflow: 'hidden', position: 'fixed', inset: 0, touchAction: 'none', background: '#000000' }}
       >
         <ServiceWorkerProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </ServiceWorkerProvider>
       </body>
     </html>

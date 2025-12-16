@@ -5,6 +5,8 @@ import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
 import { useMouseParallax } from '@/hooks/use-mouse-parallax';
 import { useSound } from '@/hooks/use-sound';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useToast } from '@/contexts/toast-context';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Color tokens - mapped from CSS custom properties
@@ -59,6 +61,8 @@ export function CetusClock() {
   const hasInitializedRef = useRef(false);
   const parallax = useMouseParallax();
   const { playSound } = useSound();
+  const { isEnabled: notificationsEnabled } = useNotifications();
+  const { showToast } = useToast();
 
   // Sync with API and get cycle data
   useEffect(() => {
@@ -118,22 +122,33 @@ export function CetusClock() {
     };
   }, [animate]);
 
-  // Play sound when cycle transitions from day to night or night to day
+  // Play sound and show toast when cycle transitions from day to night or night to day
   useEffect(() => {
-    // Skip if not yet initialized (prevents sound on initial page load)
+    // Skip if not yet initialized (prevents sound/toast on initial page load)
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
       prevIsDayRef.current = isDay;
       return;
     }
 
-    // Only play sound if there was a real transition
+    // Only trigger if there was a real transition
     if (prevIsDayRef.current !== null && prevIsDayRef.current !== isDay) {
       console.log('[CetusClock] Cycle transition detected:', prevIsDayRef.current ? 'day' : 'night', '->', isDay ? 'day' : 'night');
       playSound('cycleTransition');
+
+      // Show toast notification if notifications are enabled
+      if (notificationsEnabled) {
+        const currentState = isDay ? 'Day' : 'Night';
+        showToast({
+          title: `${currentState} Cycle`,
+          message: `The Plains of Eidolon are now in ${currentState.toLowerCase()} time.`,
+          icon: isDay ? 'sun' : 'moon',
+          duration: 5000,
+        });
+      }
     }
     prevIsDayRef.current = isDay;
-  }, [isDay, playSound]);
+  }, [isDay, playSound, notificationsEnabled, showToast]);
 
   // Slow counter-clockwise starburst rotation (120 seconds per full rotation)
   useEffect(() => {
