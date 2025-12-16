@@ -6,6 +6,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { useApiStatus } from '@/hooks/use-api-status';
 import { useSound } from '@/hooks/use-sound';
+import { AboutModal } from '@/components/about-modal';
 
 // Color tokens matching the design system
 const COLORS = {
@@ -46,6 +47,9 @@ export function FloatingMenu() {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // About modal state
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+
   // Refs for measuring panel heights
   const panel1Ref = useRef<HTMLDivElement>(null);
   const panel2Ref = useRef<HTMLDivElement>(null);
@@ -73,6 +77,15 @@ export function FloatingMenu() {
     } else {
       await document.exitFullscreen();
     }
+  }, []);
+
+  const handleOpenAbout = useCallback(() => {
+    playSound('menuOpen');
+    setIsAboutOpen(true);
+  }, [playSound]);
+
+  const handleCloseAbout = useCallback(() => {
+    setIsAboutOpen(false);
   }, []);
 
   // Measure panel heights after animations complete
@@ -554,6 +567,49 @@ export function FloatingMenu() {
                   {isInstalled ? 'App Installed' : 'Install App'}
                 </span>
               </button>
+
+              {/* About Button */}
+              <button
+                onClick={handleOpenAbout}
+                className="w-full flex items-center gap-3 p-2 rounded-lg transition-all duration-200 mt-2"
+                style={{
+                  backgroundColor: 'rgba(201, 169, 97, 0.05)',
+                  border: `1px solid transparent`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = COLORS.goldPrimary;
+                  e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'transparent';
+                  e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.05)';
+                }}
+              >
+                {/* Info Icon */}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={COLORS.goldPrimary}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span
+                  className="text-sm"
+                  style={{
+                    fontFamily: FONTS.notoSans,
+                    color: COLORS.goldPrimary,
+                  }}
+                >
+                  About
+                </span>
+              </button>
             </div>
           </motion.div>
         )}
@@ -732,6 +788,9 @@ export function FloatingMenu() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* About Modal */}
+      <AboutModal isOpen={isAboutOpen} onClose={handleCloseAbout} />
     </>
   );
 }
