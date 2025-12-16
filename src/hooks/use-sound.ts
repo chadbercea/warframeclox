@@ -5,8 +5,8 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 // Sound file paths
 const SOUNDS = {
   cycleTransition: '/warframe-sounds/CetInvasionOfferingReady.ogg',
-  menuOpen: '/warframe-sounds/UICommonDialogOpen.ogg',
-  menuClose: '/warframe-sounds/UICommonDialogClose.ogg',
+  menuOpen: '/warframe-sounds/MenuDeployDrone.ogg',
+  menuClose: '/warframe-sounds/MenuRetrieveDrone.ogg',
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;

@@ -12,6 +12,8 @@ export function CetusCycleCard() {
   const [mounted, setMounted] = useState(false);
   const prevIsDayRef = useRef<boolean | null>(null);
   const { playSound } = useSound();
+  const playSoundRef = useRef(playSound);
+  playSoundRef.current = playSound;
 
   const updateCycleState = useCallback(() => {
     setCycleState(getCetusCycleState());
@@ -46,12 +48,15 @@ export function CetusCycleCard() {
   useEffect(() => {
     if (cycleState === null) return;
 
+    const currentIsDay = cycleState.isDay;
+
     // Only play sound after initial load (not on first render)
-    if (prevIsDayRef.current !== null && prevIsDayRef.current !== cycleState.isDay) {
-      playSound('cycleTransition');
+    if (prevIsDayRef.current !== null && prevIsDayRef.current !== currentIsDay) {
+      console.log('[CetusCycleCard] Cycle transition detected:', prevIsDayRef.current, '->', currentIsDay);
+      playSoundRef.current('cycleTransition');
     }
-    prevIsDayRef.current = cycleState.isDay;
-  }, [cycleState?.isDay, playSound]);
+    prevIsDayRef.current = currentIsDay;
+  }, [cycleState]);
 
   // Prevent hydration mismatch
   if (!mounted || !cycleState) {
