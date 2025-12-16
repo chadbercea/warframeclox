@@ -8,16 +8,6 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
-  // Proxy external APIs through Vercel to bypass IP blocking
-  async rewrites() {
-    return [
-      {
-        source: '/proxy/warframe/:path*',
-        destination: 'https://api.warframe.com/cdn/:path*',
-      },
-    ];
-  },
-
   // Security headers
   async headers() {
     return [

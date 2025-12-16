@@ -114,7 +114,7 @@ async function submitSyncToServer(cycleStart: number, cycleEnd: number): Promise
   }
 }
 
-// Fetch Warframe API via proxy (avoids CORS/Origin header blocking)
+// Fetch Warframe API directly from browser (user's residential IP is not blocked)
 async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
   if (typeof window === 'undefined') return null; // Only run client-side
 
@@ -122,8 +122,8 @@ async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycle
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    // Proxy strips Origin header - direct fetch gets blocked by Cloudflare
-    const response = await fetch('/proxy/warframe/worldState.php', {
+    // Direct browser fetch - user's residential IP is not blocked by Warframe API
+    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
       signal: controller.signal,
       cache: 'no-store',
     });

@@ -15,66 +15,59 @@ This means traditional server-side cron jobs or GitHub Actions **cannot reliably
 
 ### The Solution
 
-**Browser-Side Sync**: Use the user's browser (with their residential IP) to fetch data, then sync it UP to our Edge Config storage for all users to benefit from.
+**Browser-Side Sync**: The user's browser fetches DIRECTLY from the Warframe API using their residential IP (which is not blocked), then syncs it UP to Edge Config for all users.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         BROWSER-SIDE SYNC ARCHITECTURE                      │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-   USER'S BROWSER                    VERCEL                      WARFRAME
-   (Residential IP)                  (Edge)                      (API)
-        │                              │                            │
-        │  1. Fetch via proxy          │                            │
-        │  ─────────────────────────>  │  /proxy/warframe/*         │
-        │                              │  ───────────────────────>  │
-        │                              │                            │
-        │                              │  <───────────────────────  │
-        │  <─────────────────────────  │     World State JSON       │
-        │     (passes through)         │                            │
-        │                              │                            │
-        │  2. Parse CetusSyndicate     │                            │
-        │     activation + expiry      │                            │
-        │                              │                            │
-        │  3. POST to /api/sync-cetus  │                            │
-        │  ─────────────────────────>  │                            │
-        │     { activation, expiry }   │                            │
-        │                              │                            │
-        │                              │  4. Validate & store       │
-        │                              │     in Edge Config         │
-        │                              │                            │
-        │  <─────────────────────────  │                            │
-        │     { success: true }        │                            │
-        │                              │                            │
+   USER'S BROWSER                                              WARFRAME
+   (Residential IP)                                            (API)
+        │                                                         │
+        │  1. DIRECT fetch (no proxy, no server)                  │
+        │  ────────────────────────────────────────────────────>  │
+        │     https://api.warframe.com/cdn/worldState.php         │
+        │                                                         │
+        │  <────────────────────────────────────────────────────  │
+        │     World State JSON (works because residential IP)     │
+        │                                                         │
+        │  2. Parse CetusSyndicate activation + expiry            │
+        │                                                         │
+        │                              VERCEL                     │
+        │                              (Edge)                     │
+        │                                │                        │
+        │  3. POST to /api/sync-cetus    │                        │
+        │  ───────────────────────────>  │                        │
+        │     { activation, expiry }     │                        │
+        │                                │                        │
+        │                                │  4. Validate & store   │
+        │                                │     in Edge Config     │
+        │                                │                        │
+        │  <───────────────────────────  │                        │
+        │     { success: true }          │                        │
+        │                                                         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Why this works:** The Warframe API blocks datacenter/cloud IPs but allows residential IPs. When your browser makes a direct fetch, it uses YOUR IP address, not any server's IP.
 
 ---
 
 ## Data Flow
 
-### Step 1: Browser Fetches World State
+### Step 1: Browser Fetches World State Directly
 
 **File:** `src/lib/cetus-cycle.ts` → `fetchDirectFromWarframeApi()`
 
 ```typescript
-// Browser makes request to proxy endpoint
-const response = await fetch('/proxy/warframe/worldState.php', {
+// Browser makes DIRECT request to Warframe API (user's residential IP)
+const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
   cache: 'no-store',
 });
 ```
 
-**Why the proxy?** Direct browser fetch to `api.warframe.com` fails due to CORS. The Next.js rewrite strips the Origin header.
-
-**Proxy configuration** in `next.config.mjs`:
-```javascript
-async rewrites() {
-  return [{
-    source: '/proxy/warframe/:path*',
-    destination: 'https://api.warframe.com/cdn/:path*',
-  }];
-}
-```
+**Why direct?** The Warframe API blocks datacenter IPs but allows residential IPs. The user's browser makes the request directly, using their home IP address, which is not blocked.
 
 ### Step 2: Parse Cetus Cycle Data
 
@@ -259,10 +252,9 @@ console.error('CRITICAL: Failed to sync');
 
 | File | Purpose |
 |------|---------|
-| `src/lib/cetus-cycle.ts` | Client-side sync logic, cycle calculations |
+| `src/lib/cetus-cycle.ts` | Client-side sync logic, direct API fetch, cycle calculations |
 | `src/app/api/cetus/route.ts` | Read endpoint (Edge Config → client) |
 | `src/app/api/sync-cetus/route.ts` | Write endpoint (client → Edge Config) |
-| `next.config.mjs` | Proxy rewrite for Warframe API |
 
 ---
 
@@ -314,12 +306,13 @@ The `EDGE_CONFIG_ID` is hardcoded in `sync-cetus/route.ts` for the write operati
 
 When working on this codebase:
 
-1. **DO NOT** add direct server-side Warframe API calls (they will fail)
-2. **DO NOT** remove the proxy rewrite in `next.config.mjs`
+1. **DO NOT** add server-side Warframe API calls (they will be blocked - datacenter IPs)
+2. **DO NOT** add proxy rewrites - direct browser fetch is intentional (uses user's residential IP)
 3. **DO NOT** change `console.log` to `console.error` (causes false alarm in browser)
-4. **DO** validate all timestamps before storing
-5. **DO** maintain fallback chain priority
-6. **DO** keep sync attempts rate-limited
+4. **DO** keep the direct browser fetch to `api.warframe.com` - this works because the user's IP is not blocked
+5. **DO** validate all timestamps before storing
+6. **DO** maintain fallback chain priority
+7. **DO** keep sync attempts rate-limited
 
 ### Key Invariants
 
