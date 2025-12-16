@@ -135,18 +135,19 @@ export default function EarthGlobeInner({
 
     let lastIsDay: boolean | null = null;
 
-    // Check if mobile OS - disable spinning and throttle animation
-    const isMobileOS = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // Simple check: if screen width <= 1440px, disable spinning and throttle rendering
+    const isSmallScreen = window.innerWidth <= 1440;
+    console.log('[EarthInner] Screen width:', window.innerWidth, '| Small screen mode:', isSmallScreen);
 
-    // On mobile: render once per second instead of 60fps
-    // On desktop: full 60fps animation with globe spin
+    // On small screens: render once per second instead of 60fps
+    // On large screens: full 60fps animation with globe spin
     let animationId: number | null = null;
 
     const renderFrame = () => {
       const state = getCetusCycleState();
 
-      // Only spin the globe on desktop
-      if (!isMobileOS) {
+      // Only spin the globe on large screens
+      if (!isSmallScreen) {
         earthGroup.rotation.y += 0.0005;
       }
 
@@ -180,13 +181,13 @@ export default function EarthGlobeInner({
       renderer.render(scene, camera);
     };
 
-    if (isMobileOS) {
-      // Mobile: render once immediately, then update every second
+    if (isSmallScreen) {
+      // Small screen: render once immediately, then update every second
       renderFrame();
       const intervalId = setInterval(renderFrame, 1000);
       sceneRef.current.animationId = intervalId as unknown as number;
     } else {
-      // Desktop: full 60fps animation loop
+      // Large screen: full 60fps animation loop
       const animate = () => {
         animationId = requestAnimationFrame(animate);
         renderFrame();
@@ -208,7 +209,7 @@ export default function EarthGlobeInner({
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (isMobileOS && sceneRef.current?.animationId) {
+      if (isSmallScreen && sceneRef.current?.animationId) {
         clearInterval(sceneRef.current.animationId);
       } else if (animationId) {
         cancelAnimationFrame(animationId);
