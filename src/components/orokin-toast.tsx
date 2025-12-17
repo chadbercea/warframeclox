@@ -27,7 +27,7 @@ interface OrokinToastProps {
 }
 
 function OrokinToast({ toast, onDismiss }: OrokinToastProps) {
-  const duration = toast.duration || 5000;
+  const duration = toast.duration || 10000;
   const [progress, setProgress] = useState(100);
 
   useEffect(() => {
@@ -53,93 +53,169 @@ function OrokinToast({ toast, onDismiss }: OrokinToastProps) {
 
   return (
     <motion.div
-      initial={{ x: 300, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 300, opacity: 0 }}
+      initial={{ x: 300, opacity: 0, scale: 0.95 }}
+      animate={{ x: 0, opacity: 1, scale: 1 }}
+      exit={{ x: 300, opacity: 0, scale: 0.95 }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
       className="relative overflow-hidden pointer-events-auto"
       style={{
-        background: 'linear-gradient(135deg, rgba(10, 10, 12, 0.95) 0%, rgba(20, 18, 24, 0.95) 100%)',
-        border: `1px solid ${COLORS.goldPrimary}`,
-        borderRadius: '2px',
-        minWidth: '280px',
-        maxWidth: '360px',
-        boxShadow: `0 0 20px ${COLORS.goldGlow}, inset 0 0 30px rgba(0, 0, 0, 0.5)`,
+        background: 'linear-gradient(135deg, rgba(8, 8, 10, 0.98) 0%, rgba(18, 16, 22, 0.98) 50%, rgba(12, 10, 16, 0.98) 100%)',
+        border: `2px solid ${COLORS.goldPrimary}`,
+        borderRadius: '4px',
+        minWidth: '320px',
+        maxWidth: '400px',
+        boxShadow: `
+          0 0 30px ${COLORS.goldGlow},
+          0 0 60px rgba(201, 169, 97, 0.15),
+          inset 0 0 40px rgba(0, 0, 0, 0.6),
+          inset 0 1px 0 rgba(201, 169, 97, 0.2)
+        `,
       }}
     >
-      {/* Corner accents */}
+      {/* Decorative top border line with glow */}
+      <div
+        className="absolute top-0 left-4 right-4 h-px"
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, ${COLORS.goldPrimary} 20%, ${COLORS.goldPrimary} 80%, transparent 100%)`,
+          boxShadow: `0 0 10px ${COLORS.goldGlow}`,
+        }}
+      />
+
+      {/* Enhanced corner accents - Orokin style brackets */}
       <svg
-        className="absolute top-0 left-0 w-4 h-4"
-        viewBox="0 0 16 16"
+        className="absolute top-0 left-0 w-6 h-6"
+        viewBox="0 0 24 24"
         fill="none"
       >
         <path
-          d="M0 0 L16 0 L16 2 L2 2 L2 16 L0 16 Z"
+          d="M0 0 L24 0 L24 3 L3 3 L3 24 L0 24 Z"
           fill={COLORS.goldPrimary}
+        />
+        <path
+          d="M6 6 L18 6 L18 8 L8 8 L8 18 L6 18 Z"
+          fill={COLORS.goldPrimary}
+          opacity={0.5}
         />
       </svg>
       <svg
-        className="absolute top-0 right-0 w-4 h-4"
-        viewBox="0 0 16 16"
+        className="absolute top-0 right-0 w-6 h-6"
+        viewBox="0 0 24 24"
         fill="none"
       >
         <path
-          d="M16 0 L0 0 L0 2 L14 2 L14 16 L16 16 Z"
+          d="M24 0 L0 0 L0 3 L21 3 L21 24 L24 24 Z"
           fill={COLORS.goldPrimary}
+        />
+        <path
+          d="M18 6 L6 6 L6 8 L16 8 L16 18 L18 18 Z"
+          fill={COLORS.goldPrimary}
+          opacity={0.5}
         />
       </svg>
       <svg
-        className="absolute bottom-0 left-0 w-4 h-4"
-        viewBox="0 0 16 16"
+        className="absolute bottom-0 left-0 w-6 h-6"
+        viewBox="0 0 24 24"
         fill="none"
       >
         <path
-          d="M0 16 L16 16 L16 14 L2 14 L2 0 L0 0 Z"
+          d="M0 24 L24 24 L24 21 L3 21 L3 0 L0 0 Z"
           fill={COLORS.goldPrimary}
+        />
+        <path
+          d="M6 18 L18 18 L18 16 L8 16 L8 6 L6 6 Z"
+          fill={COLORS.goldPrimary}
+          opacity={0.5}
         />
       </svg>
       <svg
-        className="absolute bottom-0 right-0 w-4 h-4"
-        viewBox="0 0 16 16"
+        className="absolute bottom-0 right-0 w-6 h-6"
+        viewBox="0 0 24 24"
         fill="none"
       >
         <path
-          d="M16 16 L0 16 L0 14 L14 14 L14 0 L16 0 Z"
+          d="M24 24 L0 24 L0 21 L21 21 L21 0 L24 0 Z"
           fill={COLORS.goldPrimary}
+        />
+        <path
+          d="M18 18 L6 18 L6 16 L16 16 L16 6 L18 6 Z"
+          fill={COLORS.goldPrimary}
+          opacity={0.5}
         />
       </svg>
 
+      {/* Decorative side accents */}
+      <div
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8"
+        style={{
+          background: `linear-gradient(180deg, transparent 0%, ${COLORS.goldPrimary} 30%, ${COLORS.goldPrimary} 70%, transparent 100%)`,
+          boxShadow: `0 0 8px ${COLORS.goldGlow}`,
+        }}
+      />
+      <div
+        className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8"
+        style={{
+          background: `linear-gradient(180deg, transparent 0%, ${COLORS.goldPrimary} 30%, ${COLORS.goldPrimary} 70%, transparent 100%)`,
+          boxShadow: `0 0 8px ${COLORS.goldGlow}`,
+        }}
+      />
+
       {/* Content */}
-      <div className="flex items-start gap-3 p-4">
-        {/* Icon */}
+      <div className="flex items-start gap-4 p-5 pt-6">
+        {/* Enhanced Icon - More prominent with glow */}
         <div
-          className="flex-shrink-0 w-10 h-10 flex items-center justify-center"
+          className="flex-shrink-0 w-14 h-14 flex items-center justify-center relative"
           style={{
-            border: `1px solid ${COLORS.goldPrimary}`,
-            borderRadius: '2px',
-            background: 'rgba(201, 169, 97, 0.1)',
+            border: `2px solid ${COLORS.goldPrimary}`,
+            borderRadius: '4px',
+            background: 'linear-gradient(135deg, rgba(201, 169, 97, 0.15) 0%, rgba(201, 169, 97, 0.05) 100%)',
+            boxShadow: `
+              0 0 20px ${COLORS.goldGlow},
+              inset 0 0 15px rgba(201, 169, 97, 0.1)
+            `,
           }}
         >
-          <svg width="24" height="24" viewBox="0 0 64 64" fill="none">
+          {/* Icon glow backdrop */}
+          <div
+            className="absolute inset-0 rounded"
+            style={{
+              background: `radial-gradient(circle at center, ${COLORS.goldGlow} 0%, transparent 70%)`,
+              opacity: 0.5,
+            }}
+          />
+          <svg width="36" height="36" viewBox="0 0 64 64" fill="none" className="relative z-10">
+            <defs>
+              <filter id="iconGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
             {toast.icon === 'sun' ? (
-              <>
-                <circle cx="32" cy="32" r="10" fill={COLORS.goldPrimary} />
-                <g stroke={COLORS.goldPrimary} strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="32" y1="8" x2="32" y2="16" />
-                  <line x1="32" y1="48" x2="32" y2="56" />
-                  <line x1="8" y1="32" x2="16" y2="32" />
-                  <line x1="48" y1="32" x2="56" y2="32" />
-                  <line x1="14.5" y1="14.5" x2="20.2" y2="20.2" />
-                  <line x1="43.8" y1="43.8" x2="49.5" y2="49.5" />
-                  <line x1="14.5" y1="49.5" x2="20.2" y2="43.8" />
-                  <line x1="43.8" y1="20.2" x2="49.5" y2="14.5" />
+              <g filter="url(#iconGlow)">
+                <circle cx="32" cy="32" r="12" fill={COLORS.goldPrimary} />
+                <g stroke={COLORS.goldPrimary} strokeWidth="3" strokeLinecap="round">
+                  <line x1="32" y1="4" x2="32" y2="14" />
+                  <line x1="32" y1="50" x2="32" y2="60" />
+                  <line x1="4" y1="32" x2="14" y2="32" />
+                  <line x1="50" y1="32" x2="60" y2="32" />
+                  <line x1="12" y1="12" x2="19" y2="19" />
+                  <line x1="45" y1="45" x2="52" y2="52" />
+                  <line x1="12" y1="52" x2="19" y2="45" />
+                  <line x1="45" y1="19" x2="52" y2="12" />
                 </g>
-              </>
+              </g>
             ) : (
-              <path
-                d="M 38 16 C 28 16, 20 24, 20 32 C 20 40, 28 48, 38 48 C 32 44, 28 38, 28 32 C 28 26, 32 20, 38 16 Z"
-                fill={COLORS.goldPrimary}
-              />
+              <g filter="url(#iconGlow)">
+                <path
+                  d="M 40 12 C 26 12, 16 22, 16 34 C 16 46, 26 56, 40 56 C 32 50, 26 42, 26 34 C 26 26, 32 18, 40 12 Z"
+                  fill={COLORS.goldPrimary}
+                />
+                {/* Moon glow accent */}
+                <circle cx="22" cy="28" r="2" fill={COLORS.goldPrimary} opacity={0.6} />
+                <circle cx="28" cy="44" r="1.5" fill={COLORS.goldPrimary} opacity={0.4} />
+              </g>
             )}
           </svg>
         </div>
@@ -150,10 +226,12 @@ function OrokinToast({ toast, onDismiss }: OrokinToastProps) {
             style={{
               fontFamily: FONTS.flareserif,
               color: COLORS.goldPrimary,
-              fontSize: '14px',
+              fontSize: '16px',
               fontWeight: 700,
-              letterSpacing: '0.08em',
-              marginBottom: '4px',
+              letterSpacing: '0.12em',
+              marginBottom: '6px',
+              textShadow: `0 0 10px ${COLORS.goldGlow}`,
+              textTransform: 'uppercase',
             }}
           >
             {toast.title}
@@ -161,9 +239,10 @@ function OrokinToast({ toast, onDismiss }: OrokinToastProps) {
           <p
             style={{
               fontFamily: FONTS.notoSans,
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '12px',
-              lineHeight: 1.4,
+              color: 'rgba(255, 255, 255, 0.85)',
+              fontSize: '13px',
+              lineHeight: 1.5,
+              letterSpacing: '0.02em',
             }}
           >
             {toast.message}
@@ -171,19 +250,27 @@ function OrokinToast({ toast, onDismiss }: OrokinToastProps) {
         </div>
       </div>
 
-      {/* Decay progress bar */}
+      {/* Decorative bottom line above progress bar */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-1"
+        className="absolute bottom-3 left-4 right-4 h-px"
         style={{
-          background: 'rgba(201, 169, 97, 0.2)',
+          background: `linear-gradient(90deg, transparent 0%, rgba(201, 169, 97, 0.3) 20%, rgba(201, 169, 97, 0.3) 80%, transparent 100%)`,
+        }}
+      />
+
+      {/* Decay progress bar - enhanced */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-1.5"
+        style={{
+          background: 'rgba(201, 169, 97, 0.15)',
         }}
       >
         <motion.div
           className="h-full"
           style={{
             width: `${progress}%`,
-            background: `linear-gradient(90deg, ${COLORS.goldPrimary} 0%, rgba(201, 169, 97, 0.6) 100%)`,
-            boxShadow: `0 0 8px ${COLORS.goldGlow}`,
+            background: `linear-gradient(90deg, ${COLORS.goldPrimary} 0%, rgba(201, 169, 97, 0.8) 50%, rgba(201, 169, 97, 0.6) 100%)`,
+            boxShadow: `0 0 12px ${COLORS.goldGlow}, 0 0 4px ${COLORS.goldPrimary}`,
           }}
         />
       </div>
@@ -201,7 +288,7 @@ export function OrokinToastContainer({ toasts, onDismiss }: ToastContainerProps)
   return (
     <div
       className="fixed bottom-4 right-4 flex flex-col gap-3 z-50 pointer-events-none"
-      style={{ maxWidth: '400px' }}
+      style={{ maxWidth: '420px' }}
     >
       <AnimatePresence mode="sync">
         {toasts.map((toast) => (
