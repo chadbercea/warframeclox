@@ -138,12 +138,13 @@ export function CetusClock() {
 
       // Show toast notification if notifications are enabled
       if (notificationsEnabled) {
-        const currentState = isDay ? 'Day' : 'Night';
         showToast({
-          title: `${currentState} Cycle`,
-          message: `The Plains of Eidolon are now in ${currentState.toLowerCase()} time.`,
+          title: isDay ? 'The Light Returns' : 'The Long Dark Begins',
+          message: isDay
+            ? 'Unum\'s radiance graces the Plains once more. The Eidolons retreat to slumber beneath the waters.'
+            : 'The Sentient spirits rise from their ancient tombs. Tread carefully, Tenno—the night belongs to the Eidolons.',
           icon: isDay ? 'sun' : 'moon',
-          duration: 5000,
+          duration: 10000,
         });
       }
     }
