@@ -6,6 +6,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { useApiStatus } from '@/hooks/use-api-status';
 import { useSound } from '@/hooks/use-sound';
+import { useToast } from '@/contexts/toast-context';
 import { AboutModal } from '@/components/about-modal';
 
 // Color tokens matching the design system
@@ -60,6 +61,7 @@ export function FloatingMenu() {
   const { canInstall, install, isInstalled } = usePWAInstall();
   const { status: apiStatus, source: apiSource, checkConnection } = useApiStatus();
   const { playSound, isEnabled: soundEnabled, toggleSound } = useSound();
+  const { showToast } = useToast();
 
   // Listen for fullscreen changes (e.g., user presses Escape)
   useEffect(() => {
@@ -87,6 +89,23 @@ export function FloatingMenu() {
   const handleCloseAbout = useCallback(() => {
     setIsAboutOpen(false);
   }, []);
+
+  const handleShare = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast({
+        title: 'LINK COPIED',
+        message: 'Share link has been copied to your clipboard.',
+        icon: 'sun',
+      });
+    } catch (err) {
+      showToast({
+        title: 'COPY FAILED',
+        message: 'Unable to copy link to clipboard.',
+        icon: 'moon',
+      });
+    }
+  }, [showToast]);
 
   // Measure panel heights after animations complete
   useEffect(() => {
@@ -604,6 +623,51 @@ export function FloatingMenu() {
                   }}
                 >
                   About
+                </span>
+              </button>
+
+              {/* Share Button */}
+              <button
+                onClick={handleShare}
+                className="w-full flex items-center gap-3 p-2 rounded-lg transition-all duration-200 mt-2"
+                style={{
+                  backgroundColor: 'rgba(201, 169, 97, 0.05)',
+                  border: `1px solid transparent`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = COLORS.goldPrimary;
+                  e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'transparent';
+                  e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.05)';
+                }}
+              >
+                {/* Share Icon */}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={COLORS.goldPrimary}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                </svg>
+                <span
+                  className="text-sm"
+                  style={{
+                    fontFamily: FONTS.notoSans,
+                    color: COLORS.goldPrimary,
+                  }}
+                >
+                  Share
                 </span>
               </button>
             </div>
