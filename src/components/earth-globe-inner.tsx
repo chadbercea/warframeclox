@@ -135,6 +135,7 @@ export default function EarthGlobeInner({
     });
 
     let lastIsDay: boolean | null = null;
+    let lastEmissiveIntensity: number | null = null;
 
     // Simple check: if screen width <= 1440px, disable spinning and throttle rendering
     const isSmallScreen = window.innerWidth <= 1440;
@@ -168,12 +169,18 @@ export default function EarthGlobeInner({
       );
 
       const darkness = sunAngle / Math.PI;
-      earthMaterials.forEach((mat) => {
-        if (mat.emissiveMap) {
-          mat.emissiveIntensity = darkness * 2;
-          mat.emissive.setHex(0xffcc66);
-        }
-      });
+      const newEmissiveIntensity = darkness * 2;
+
+      // Only update materials when emissive intensity changes by >0.01
+      if (lastEmissiveIntensity === null || Math.abs(newEmissiveIntensity - lastEmissiveIntensity) > 0.01) {
+        lastEmissiveIntensity = newEmissiveIntensity;
+        earthMaterials.forEach((mat) => {
+          if (mat.emissiveMap) {
+            mat.emissiveIntensity = newEmissiveIntensity;
+            mat.emissive.setHex(0xffcc66);
+          }
+        });
+      }
 
       if (lastIsDay !== state.isDay) {
         console.log(`[EarthInner] ${state.isDay ? 'DAY' : 'NIGHT'} started`);
