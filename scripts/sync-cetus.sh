@@ -4,10 +4,10 @@
 
 set -e
 
-# Load token from .env.local if not set
-if [ -z "$VERCEL_ACCESS_TOKEN" ]; then
+# Load environment variables from .env.local if not set
+if [ -z "$VERCEL_ACCESS_TOKEN" ] || [ -z "$EDGE_CONFIG_ID" ]; then
   if [ -f ".env.local" ]; then
-    export $(grep VERCEL_ACCESS_TOKEN .env.local | xargs)
+    export $(grep -E '^(VERCEL_ACCESS_TOKEN|EDGE_CONFIG_ID)=' .env.local | xargs)
   fi
 fi
 
@@ -16,7 +16,10 @@ if [ -z "$VERCEL_ACCESS_TOKEN" ]; then
   exit 1
 fi
 
-EDGE_CONFIG_ID="ecfg_i7wukxkcxmejcih7vtkpfcthms6b"
+if [ -z "$EDGE_CONFIG_ID" ]; then
+  echo "❌ EDGE_CONFIG_ID not set. Add it to .env.local or export it."
+  exit 1
+fi
 
 echo "📡 Fetching Cetus data from Warframe API..."
 
