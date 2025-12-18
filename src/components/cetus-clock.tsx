@@ -5,7 +5,6 @@ import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
 import { useMouseParallax } from '@/hooks/use-mouse-parallax';
 import { useSound } from '@/hooks/use-sound';
-import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/contexts/toast-context';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -61,8 +60,10 @@ export function CetusClock() {
   const hasInitializedRef = useRef(false);
   const parallax = useMouseParallax();
   const { playSound } = useSound();
-  const { isEnabled: notificationsEnabled } = useNotifications();
   const { showToast } = useToast();
+
+  // Track if initial toast has been shown
+  const hasShownInitialToastRef = useRef(false);
 
   // Sync with API and get cycle data
   useEffect(() => {
@@ -77,6 +78,17 @@ export function CetusClock() {
       const elapsed = (state.percentComplete / 100) * cycleDurationMs;
       const cycleStart = Date.now() - elapsed;
       setCycleStartTimestamp(cycleStart);
+
+      // Show initial load toast with current cycle status (only once)
+      if (!hasShownInitialToastRef.current) {
+        hasShownInitialToastRef.current = true;
+        showToast({
+          title: state.isDay ? 'Day on the Plains' : 'Night on the Plains',
+          message: `${state.timeLeftFormatted} remaining until ${state.isDay ? 'nightfall' : 'dawn'}.`,
+          icon: state.isDay ? 'sun' : 'moon',
+          duration: 6000,
+        });
+      }
     };
 
     initCycle();
@@ -84,7 +96,7 @@ export function CetusClock() {
     // Re-sync every 5 minutes
     const interval = setInterval(initCycle, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [showToast]);
 
   // Animation loop using requestAnimationFrame
   const animate = useCallback(() => {
@@ -136,20 +148,18 @@ export function CetusClock() {
       console.log('[CetusClock] Cycle transition detected:', prevIsDayRef.current ? 'day' : 'night', '->', isDay ? 'day' : 'night');
       playSound('cycleTransition');
 
-      // Show toast notification if notifications are enabled
-      if (notificationsEnabled) {
-        showToast({
-          title: isDay ? 'The Light Returns' : 'The Long Dark Begins',
-          message: isDay
-            ? 'Unum\'s radiance graces the Plains once more. The Eidolons retreat to slumber beneath the waters.'
-            : 'The Sentient spirits rise from their ancient tombs. Tread carefully, Tenno—the night belongs to the Eidolons.',
-          icon: isDay ? 'sun' : 'moon',
-          duration: 10000,
-        });
-      }
+      // Show toast notification for cycle transition (always show, independent of browser notifications)
+      showToast({
+        title: isDay ? 'The Light Returns' : 'The Long Dark Begins',
+        message: isDay
+          ? 'Unum\'s radiance graces the Plains once more. The Eidolons retreat to slumber beneath the waters.'
+          : 'The Sentient spirits rise from their ancient tombs. Tread carefully, Tenno—the night belongs to the Eidolons.',
+        icon: isDay ? 'sun' : 'moon',
+        duration: 10000,
+      });
     }
     prevIsDayRef.current = isDay;
-  }, [isDay, playSound, notificationsEnabled, showToast]);
+  }, [isDay, playSound, showToast]);
 
   // Slow counter-clockwise starburst rotation (120 seconds per full rotation)
   useEffect(() => {
