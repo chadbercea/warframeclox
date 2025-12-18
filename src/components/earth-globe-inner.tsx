@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { getReduceMotionEnabled } from '@/hooks/use-reduce-motion';
+import { logger } from '@/lib/logger';
 
 // Log immediately when module loads
-console.log('[EarthInner] Module loaded');
+logger.globe.debug('Module loaded');
 
 const GLOBE_RADIUS = 100;
 const MODEL_SCALE = 2;
@@ -31,18 +32,18 @@ export default function EarthGlobeInner({
     animationId: number | null;
   } | null>(null);
 
-  console.log('[EarthInner] Component rendering');
+  logger.globe.debug('Component rendering');
 
   useEffect(() => {
-    console.log('[EarthInner] useEffect running');
+    logger.globe.debug('useEffect running');
 
     if (!containerRef.current) {
-      console.error('[EarthInner] containerRef is null!');
+      logger.globe.error('containerRef is null!');
       return;
     }
 
     const container = containerRef.current;
-    console.log('[EarthInner] Container found, setting up scene');
+    logger.globe.debug('Container found, setting up scene');
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -90,15 +91,14 @@ export default function EarthGlobeInner({
     const loader = new GLTFLoader();
     const modelUrl = '/earth.glb';
 
-    console.log('[EarthInner] Starting GLB load from:', modelUrl);
-    console.log('[EarthInner] Current URL:', window.location.href);
+    logger.globe.info('Starting GLB load', { modelUrl, currentUrl: window.location.href });
 
     loader.load(
       modelUrl,
       (gltf) => {
         if (!sceneRef.current) return;
 
-        console.log('[EarthInner] GLB loaded successfully!');
+        logger.globe.info('GLB loaded successfully');
 
         const earth = gltf.scene;
         earth.traverse((child) => {
@@ -116,22 +116,22 @@ export default function EarthGlobeInner({
       (progress) => {
         if (progress.lengthComputable) {
           const percent = Math.round((progress.loaded / progress.total) * 100);
-          console.log(`[EarthInner] Progress: ${percent}%`);
+          logger.globe.debug(`Progress: ${percent}%`);
           onLoadProgress?.(percent);
         } else {
-          console.log(`[EarthInner] Loading... ${progress.loaded} bytes`);
+          logger.globe.debug(`Loading... ${progress.loaded} bytes`);
         }
       },
       (error) => {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[EarthInner] GLB load FAILED:', errorMsg);
+        logger.globe.error('GLB load FAILED', { error: errorMsg });
         onLoadError?.(errorMsg);
       }
     );
 
     // Sync cycle
     syncCetusCycle().then((source) => {
-      console.log('[EarthInner] Cycle synced from:', source);
+      logger.globe.info('Cycle synced', { source });
     });
 
     let lastIsDay: boolean | null = null;
@@ -140,7 +140,11 @@ export default function EarthGlobeInner({
     // Simple check: if screen width <= 1440px, disable spinning and throttle rendering
     const isSmallScreen = window.innerWidth <= 1440;
     const reduceMotion = getReduceMotionEnabled();
-    console.log('[EarthInner] Screen width:', window.innerWidth, '| Small screen mode:', isSmallScreen, '| Reduce motion:', reduceMotion);
+    logger.globe.info('Render mode configured', {
+      screenWidth: window.innerWidth,
+      isSmallScreen,
+      reduceMotion,
+    });
 
     // On small screens: render once per second instead of 60fps
     // On large screens: full 60fps animation with globe spin
@@ -183,7 +187,7 @@ export default function EarthGlobeInner({
       }
 
       if (lastIsDay !== state.isDay) {
-        console.log(`[EarthInner] ${state.isDay ? 'DAY' : 'NIGHT'} started`);
+        logger.cetus.info(`${state.isDay ? 'DAY' : 'NIGHT'} cycle started`);
         lastIsDay = state.isDay;
       }
 
