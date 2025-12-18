@@ -9,6 +9,10 @@ const EDGE_CONFIG_ID = process.env.EDGE_CONFIG_ID;
 // Max unchanged attempts before stopping for the day
 const MAX_UNCHANGED_ATTEMPTS = 3;
 
+// Rate limiting: max requests per minute (global across all clients)
+const MAX_REQUESTS_PER_MINUTE = 30;
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
 // Validate timestamp is reasonable (not too old, not too far in the future)
 function isValidTimestamp(ts: number, allowFuture: boolean = false): boolean {
   const now = Date.now();
@@ -23,11 +27,56 @@ function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+// Update rate limit counter in Edge Config
+async function updateRateLimit(
+  vercelToken: string,
+  edgeConfigId: string,
+  currentData: { count: number; windowStart: number } | null | undefined
+): Promise<void> {
+  const now = Date.now();
+  const windowExpired = !currentData || (now - currentData.windowStart > RATE_LIMIT_WINDOW_MS);
+
+  const newRateLimit = windowExpired
+    ? { count: 1, windowStart: now }
+    : { count: currentData!.count + 1, windowStart: currentData!.windowStart };
+
+  await fetch(
+    `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${vercelToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { operation: 'upsert', key: 'rate_limit', value: newRateLimit },
+        ],
+      }),
+    }
+  );
+}
+
 // POST: Accept sync data from client browsers (residential IPs)
 export async function POST(request: NextRequest) {
   const logPrefix = `[sync-cetus ${new Date().toISOString()}]`;
-  
+
   try {
+    // Rate limiting check
+    const rateLimitData = await get<{ count: number; windowStart: number }>('rate_limit');
+    const rateLimitNow = Date.now();
+
+    if (rateLimitData) {
+      const windowExpired = rateLimitNow - rateLimitData.windowStart > RATE_LIMIT_WINDOW_MS;
+      if (!windowExpired && rateLimitData.count >= MAX_REQUESTS_PER_MINUTE) {
+        console.log(`${logPrefix} RATE LIMITED - ${rateLimitData.count} requests in current window`);
+        return Response.json({
+          success: false,
+          error: 'Rate limit exceeded. Please try again later.',
+        }, { status: 429 });
+      }
+    }
+
     const body = await request.json();
     const { activation, expiry } = body;
 
@@ -87,6 +136,11 @@ export async function POST(request: NextRequest) {
         error: 'Server configuration error'
       }, { status: 500 });
     }
+
+    // Update rate limit counter (non-blocking, fire and forget)
+    updateRateLimit(vercelToken, EDGE_CONFIG_ID, rateLimitData).catch(() => {
+      // Silently ignore rate limit update failures
+    });
 
     // Check if data is the same (same activation timestamp)
     if (currentStart === activationTs) {
