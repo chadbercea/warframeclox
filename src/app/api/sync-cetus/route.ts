@@ -170,12 +170,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: Server-side sync (for cron - will fail due to IP blocking, kept for reference)
+// GET: Server-side sync (for Vercel cron only)
 export async function GET(request: NextRequest) {
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const isTest = request.nextUrl.searchParams.get('test') === '1';
-  
-  if (!isVercelCron && !isTest) {
+
+  if (!isVercelCron) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
