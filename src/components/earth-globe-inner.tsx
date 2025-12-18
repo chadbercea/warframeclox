@@ -189,10 +189,14 @@ export default function EarthGlobeInner({
       const intervalId = setInterval(renderFrame, 1000);
       sceneRef.current.animationId = intervalId as unknown as number;
     } else {
-      // Large screen: full 60fps animation loop
+      // Large screen: 30fps animation loop (skip every other frame)
+      let frameCount = 0;
       const animate = () => {
         animationId = requestAnimationFrame(animate);
-        renderFrame();
+        frameCount++;
+        if (frameCount % 2 === 0) {
+          renderFrame();
+        }
       };
       animate();
     }
