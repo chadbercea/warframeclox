@@ -4,6 +4,7 @@ import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
+import { getReduceMotionEnabled } from '@/hooks/use-reduce-motion';
 
 // Log immediately when module loads
 console.log('[EarthInner] Module loaded');
@@ -137,7 +138,8 @@ export default function EarthGlobeInner({
 
     // Simple check: if screen width <= 1440px, disable spinning and throttle rendering
     const isSmallScreen = window.innerWidth <= 1440;
-    console.log('[EarthInner] Screen width:', window.innerWidth, '| Small screen mode:', isSmallScreen);
+    const reduceMotion = getReduceMotionEnabled();
+    console.log('[EarthInner] Screen width:', window.innerWidth, '| Small screen mode:', isSmallScreen, '| Reduce motion:', reduceMotion);
 
     // On small screens: render once per second instead of 60fps
     // On large screens: full 60fps animation with globe spin
@@ -146,8 +148,8 @@ export default function EarthGlobeInner({
     const renderFrame = () => {
       const state = getCetusCycleState();
 
-      // Only spin the globe on large screens
-      if (!isSmallScreen) {
+      // Only spin the globe on large screens and when reduce motion is off
+      if (!isSmallScreen && !reduceMotion) {
         earthGroup.rotation.y += 0.0005;
       }
 
