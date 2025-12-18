@@ -63,13 +63,17 @@ export default function EarthGlobeInner({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
+    // Enable tone mapping for better PBR color reproduction
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    // Sun light with warm color temperature for realistic sunlight
+    const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.5);
     scene.add(sunLight);
 
     sceneRef.current = {
