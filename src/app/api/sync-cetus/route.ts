@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const activationTs = typeof activation === 'string' ? parseInt(activation) : activation;
-    const expiryTs = typeof expiry === 'string' ? parseInt(expiry) : expiry;
+    const activationTs = typeof activation === 'string' ? parseInt(activation, 10) : activation;
+    const expiryTs = typeof expiry === 'string' ? parseInt(expiry, 10) : expiry;
 
     // Validate timestamps are reasonable (expiry can be in future)
     if (!isValidTimestamp(activationTs) || !isValidTimestamp(expiryTs, true)) {
@@ -205,8 +205,8 @@ export async function GET(request: NextRequest) {
       return Response.json({ success: false, error: 'CetusSyndicate not found' });
     }
     
-    const activation = parseInt(cetusMission.Activation.$date.$numberLong);
-    const expiry = parseInt(cetusMission.Expiry.$date.$numberLong);
+    const activation = parseInt(cetusMission.Activation.$date.$numberLong, 10);
+    const expiry = parseInt(cetusMission.Expiry.$date.$numberLong, 10);
     
     // Use the same update logic as POST
     const vercelToken = process.env.VERCEL_ACCESS_TOKEN;
