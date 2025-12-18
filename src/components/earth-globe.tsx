@@ -2,21 +2,22 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 // Log immediately when this module loads
-console.log('[EarthGlobe] Module loaded');
+logger.globe.debug('Module loaded');
 
 type LoadState = 'loading' | 'success' | 'error';
 
 // Dynamically import the 3D component to avoid SSR issues with Three.js
 const EarthGlobeInner = dynamic(
   () => {
-    console.log('[EarthGlobe] Starting dynamic import...');
+    logger.globe.debug('Starting dynamic import');
     return import('@/components/earth-globe-inner').then((mod) => {
-      console.log('[EarthGlobe] Dynamic import SUCCESS');
+      logger.globe.info('Dynamic import SUCCESS');
       return mod;
     }).catch((err) => {
-      console.error('[EarthGlobe] Dynamic import FAILED:', err);
+      logger.globe.error('Dynamic import FAILED', { error: err });
       throw err;
     });
   },
@@ -31,23 +32,23 @@ export function EarthGlobe() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    console.log('[EarthGlobe] Component mounted, loadState:', loadState);
+    logger.globe.debug('Component mounted', { loadState });
   }, [loadState]);
 
   // Callback for inner component to report status
   const onLoadSuccess = () => {
-    console.log('[EarthGlobe] Model loaded successfully');
+    logger.globe.info('Model loaded successfully');
     setLoadState('success');
   };
 
   const onLoadError = (error: string) => {
-    console.error('[EarthGlobe] Model load error:', error);
+    logger.globe.error('Model load error', { error });
     setLoadState('error');
     setErrorMsg(error);
   };
 
   const onLoadProgress = (percent: number) => {
-    console.log('[EarthGlobe] Load progress:', percent + '%');
+    logger.globe.debug(`Load progress: ${percent}%`);
   };
 
   return (
