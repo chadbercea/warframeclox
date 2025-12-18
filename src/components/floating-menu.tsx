@@ -6,6 +6,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
 import { useApiStatus } from '@/hooks/use-api-status';
 import { useSound } from '@/hooks/use-sound';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useToast } from '@/contexts/toast-context';
 import { AboutModal } from '@/components/about-modal';
 
@@ -61,6 +62,7 @@ export function FloatingMenu() {
   const { canInstall, install, isInstalled } = usePWAInstall();
   const { status: apiStatus, source: apiSource, checkConnection } = useApiStatus();
   const { playSound, isEnabled: soundEnabled, toggleSound } = useSound();
+  const { isEnabled: reduceMotionEnabled, toggleReduceMotion } = useReduceMotion();
   const { showToast } = useToast();
 
   // Listen for fullscreen changes (e.g., user presses Escape)
@@ -492,6 +494,74 @@ export function FloatingMenu() {
                 style={{
                   backgroundColor: isFullscreen ? '#0a0a0c' : 'rgba(150, 150, 150, 0.8)',
                   transform: isFullscreen ? 'translateX(18px)' : 'translateX(2px)',
+                }}
+              />
+            </div>
+          </button>
+
+          {/* Reduce Motion Toggle */}
+          <button
+            onClick={toggleReduceMotion}
+            className="w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 mt-2"
+            style={{
+              backgroundColor: 'rgba(201, 169, 97, 0.05)',
+              border: `1px solid transparent`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = COLORS.goldPrimary;
+              e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'transparent';
+              e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.05)';
+            }}
+          >
+            <div className="flex items-center gap-3">
+              {/* Motion Icon */}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={COLORS.goldPrimary}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {reduceMotionEnabled ? (
+                  <>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M5 12h14" />
+                    <path d="M12 5l7 7-7 7" />
+                  </>
+                )}
+              </svg>
+              <span
+                className="text-sm"
+                style={{
+                  fontFamily: FONTS.notoSans,
+                  color: COLORS.goldPrimary,
+                }}
+              >
+                Reduce Motion
+              </span>
+            </div>
+            {/* Toggle Switch */}
+            <div
+              className="w-9 h-5 rounded-full relative transition-colors duration-200"
+              style={{
+                backgroundColor: reduceMotionEnabled ? COLORS.goldPrimary : 'rgba(100, 100, 100, 0.3)',
+              }}
+            >
+              <div
+                className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
+                style={{
+                  backgroundColor: reduceMotionEnabled ? '#0a0a0c' : 'rgba(150, 150, 150, 0.8)',
+                  transform: reduceMotionEnabled ? 'translateX(18px)' : 'translateX(2px)',
                 }}
               />
             </div>
