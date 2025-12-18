@@ -4,7 +4,7 @@ import { get } from '@vercel/edge-config';
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-const EDGE_CONFIG_ID = 'ecfg_i7wukxkcxmejcih7vtkpfcthms6b';
+const EDGE_CONFIG_ID = process.env.EDGE_CONFIG_ID;
 
 // Max unchanged attempts before stopping for the day
 const MAX_UNCHANGED_ATTEMPTS = 3;
@@ -81,10 +81,10 @@ export async function POST(request: NextRequest) {
     }
 
     const vercelToken = process.env.VERCEL_ACCESS_TOKEN;
-    if (!vercelToken) {
-      return Response.json({ 
-        success: false, 
-        error: 'Server configuration error' 
+    if (!vercelToken || !EDGE_CONFIG_ID) {
+      return Response.json({
+        success: false,
+        error: 'Server configuration error'
       }, { status: 500 });
     }
 
@@ -210,8 +210,8 @@ export async function GET(request: NextRequest) {
     
     // Use the same update logic as POST
     const vercelToken = process.env.VERCEL_ACCESS_TOKEN;
-    if (!vercelToken) {
-      return Response.json({ success: false, error: 'Missing token' }, { status: 500 });
+    if (!vercelToken || !EDGE_CONFIG_ID) {
+      return Response.json({ success: false, error: 'Server configuration error' }, { status: 500 });
     }
 
     const updateResponse = await fetch(
