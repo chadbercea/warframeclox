@@ -1,3 +1,5 @@
+import { logger } from '@/lib/logger';
+
 // Cetus day/night cycle calculation
 // Day cycle: 100 minutes, Night cycle: 50 minutes
 // Total cycle: 150 minutes (9000 seconds)
@@ -101,15 +103,15 @@ async function submitSyncToServer(cycleStart: number, cycleEnd: number): Promise
     });
 
     if (!response.ok) {
-      console.log('[Cetus] Server sync failed:', response.status);
+      logger.cetus.warn('Server sync failed', { status: response.status });
       return false;
     }
 
     const result = await response.json();
-    console.log('[Cetus] Server sync result:', result);
+    logger.cetus.info('Server sync result', result);
     return result.success && result.action === 'updated';
   } catch (error) {
-    console.log('[Cetus] Server sync error:', error);
+    logger.cetus.warn('Server sync error', { error });
     return false;
   }
 }
@@ -140,7 +142,7 @@ async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycle
 
       // Validate timestamps
       if (cycleStart > 1577836800000 && cycleEnd > cycleStart) {
-        console.log('[Cetus] API fetch successful:', { cycleStart, cycleEnd });
+        logger.cetus.info('Direct API fetch successful', { cycleStart, cycleEnd });
 
         // Submit to server to update Edge Config for all users
         submitSyncToServer(cycleStart, cycleEnd);
@@ -175,7 +177,7 @@ export async function fetchCetusCycleFromApi(): Promise<{ cycleStart: number; cy
       return { cycleStart: data.cycleStart, cycleEnd: data.cycleEnd, source: data.source };
     }
   } catch (error) {
-    console.error('Failed to fetch Cetus cycle from API:', error);
+    logger.cetus.error('Failed to fetch Cetus cycle from API', { error });
     syncStatus = {
       source: 'error',
       isStale: true,

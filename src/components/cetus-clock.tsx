@@ -5,6 +5,7 @@ import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
 import { calculateCurrentPositions, type DiscPositions } from '@/lib/clock-math';
 import { useMouseParallax } from '@/hooks/use-mouse-parallax';
 import { useSound } from '@/hooks/use-sound';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useToast } from '@/contexts/toast-context';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,12 +59,19 @@ export function CetusClock() {
   const outerRingRef = useRef<number | null>(null);
   const prevIsDayRef = useRef<boolean | null>(null);
   const hasInitializedRef = useRef(false);
-  const parallax = useMouseParallax();
+  const rawParallax = useMouseParallax();
   const { playSound } = useSound();
+  const { isEnabled: reduceMotionEnabled } = useReduceMotion();
   const { showToast } = useToast();
 
   // Track if initial toast has been shown
   const hasShownInitialToastRef = useRef(false);
+
+  // Neutralize parallax when reduce motion is enabled
+  const noMotion = { rotateX: 0, rotateY: 0, translateX: 0, translateY: 0, translateZ: 0 };
+  const parallax = reduceMotionEnabled
+    ? { background: noMotion, circles: noMotion, text: noMotion }
+    : rawParallax;
 
   // Sync with API and get cycle data
   useEffect(() => {
