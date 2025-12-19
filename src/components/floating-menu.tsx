@@ -93,8 +93,12 @@ export function FloatingMenu() {
   }, []);
 
   const handleShare = useCallback(async () => {
+    const shareUrl = 'https://www.warframeclox.com';
+    const shareText = 'Behold, Tenno—the Unum\'s light measured in mortal time. Know when day yields to night on the Plains. The Eidolons stir at dusk.';
+    const shareContent = `${shareText}\n\n${shareUrl}`;
+
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareContent);
       showToast({
         title: 'LINK COPIED',
         message: 'Share link has been copied to your clipboard.',
