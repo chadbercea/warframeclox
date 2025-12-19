@@ -297,7 +297,17 @@ export function FloatingMenu() {
           {/* Notifications Toggle */}
           {isSupported && (
             <button
-              onClick={toggleNotifications}
+              onClick={() => {
+                toggleNotifications();
+                // Show toast for notification toggle (will show opposite state since toggle happens first)
+                showToast({
+                  title: notificationsEnabled ? 'NOTIFICATIONS DISABLED' : 'NOTIFICATIONS ENABLED',
+                  message: notificationsEnabled
+                    ? 'Browser notifications have been turned off.'
+                    : 'You will receive browser alerts before cycle transitions.',
+                  icon: notificationsEnabled ? 'moon' : 'sun',
+                });
+              }}
               disabled={permission === 'denied'}
               className="w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200"
               style={{
@@ -363,7 +373,17 @@ export function FloatingMenu() {
 
           {/* Sound Toggle */}
           <button
-            onClick={toggleSound}
+            onClick={() => {
+              toggleSound();
+              // Show toast for sound toggle (will show opposite state since toggle happens first)
+              showToast({
+                title: soundEnabled ? 'SOUND DISABLED' : 'SOUND ENABLED',
+                message: soundEnabled
+                  ? 'Audio effects have been muted.'
+                  : 'You will hear audio cues during cycle transitions.',
+                icon: soundEnabled ? 'moon' : 'sun',
+              });
+            }}
             className="w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 mt-2"
             style={{
               backgroundColor: 'rgba(201, 169, 97, 0.05)',
