@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { ServiceWorkerProvider } from "@/components/service-worker-provider";
-import { PostHogProvider } from "@/components/posthog-provider";
 import { ToastProvider } from "@/contexts/toast-context";
 import "./globals.css";
 
@@ -104,13 +103,11 @@ export default function RootLayout({
         suppressHydrationWarning
         style={{ overflow: 'hidden', position: 'fixed', inset: 0, touchAction: 'none', background: '#000000' }}
       >
-        <PostHogProvider>
-          <ServiceWorkerProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </ServiceWorkerProvider>
-        </PostHogProvider>
+        <ServiceWorkerProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </ServiceWorkerProvider>
         <Analytics />
       </body>
     </html>
