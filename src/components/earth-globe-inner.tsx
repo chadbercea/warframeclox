@@ -4,11 +4,8 @@ import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getCetusCycleState, syncCetusCycle } from '@/lib/cetus-cycle';
-import { getReduceMotionEnabled } from '@/hooks/use-reduce-motion';
-import { logger } from '@/lib/logger';
 
-// Log immediately when module loads
-logger.globe.debug('Module loaded');
+console.log('[EarthInner] Module loaded');
 
 const GLOBE_RADIUS = 100;
 const MODEL_SCALE = 2;
@@ -32,18 +29,18 @@ export default function EarthGlobeInner({
     animationId: number | null;
   } | null>(null);
 
-  logger.globe.debug('Component rendering');
+  console.log('[EarthInner] Component rendering');
 
   useEffect(() => {
-    logger.globe.debug('useEffect running');
+    console.log('[EarthInner] useEffect running');
 
     if (!containerRef.current) {
-      logger.globe.error('containerRef is null!');
+      console.error('[EarthInner] containerRef is null!');
       return;
     }
 
     const container = containerRef.current;
-    logger.globe.debug('Container found, setting up scene');
+    console.log('[EarthInner] Container found, setting up scene');
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -63,18 +60,16 @@ export default function EarthGlobeInner({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
-    // Enable tone mapping for better PBR color reproduction
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
-    scene.add(ambientLight);
-
-    // Sun light with warm color temperature for realistic sunlight
-    const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.5);
+    // Only sun light - no ambient, no environment
+    const sunLight = new THREE.DirectionalLight(0xffffff, 4.0);
+    sunLight.target.position.set(0, 0, 0);
     scene.add(sunLight);
+    scene.add(sunLight.target);
 
     sceneRef.current = {
       scene,
@@ -93,22 +88,44 @@ export default function EarthGlobeInner({
 
     // Load model
     const loader = new GLTFLoader();
-    const modelUrl = '/earth.glb';
+    const modelUrl = '/earth-model/earth.gltf';
 
-    logger.globe.info('Starting GLB load', { modelUrl, currentUrl: window.location.href });
+    console.log('[EarthInner] Starting GLTF load from:', modelUrl);
 
     loader.load(
       modelUrl,
       (gltf) => {
         if (!sceneRef.current) return;
 
-        logger.globe.info('GLB loaded successfully');
+        console.log('[EarthInner] GLB loaded successfully!');
 
         const earth = gltf.scene;
         earth.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material) {
             const mat = child.material as THREE.MeshStandardMaterial;
-            earthMaterials.push(mat);
+
+            if (mat.name === 'phong1') {
+              // Earth surface
+              mat.metalness = 0.0;
+              mat.roughness = 0.8;
+              mat.emissive = new THREE.Color(0xffffff);
+              mat.emissiveIntensity = 0;
+              if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+              if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+              earthMaterials.push(mat);
+            } else if (mat.name === 'lambert6') {
+              // Clouds
+              mat.metalness = 0.0;
+              mat.roughness = 1.0;
+              mat.transparent = true;
+              mat.opacity = 0.3;
+              mat.depthWrite = false;
+              if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+            } else if (mat.name === 'lambert7') {
+              // Atmosphere - hidden
+              mat.visible = false;
+            }
+            mat.needsUpdate = true;
           }
         });
 
@@ -120,45 +137,35 @@ export default function EarthGlobeInner({
       (progress) => {
         if (progress.lengthComputable) {
           const percent = Math.round((progress.loaded / progress.total) * 100);
-          logger.globe.debug(`Progress: ${percent}%`);
+          console.log(`[EarthInner] Progress: ${percent}%`);
           onLoadProgress?.(percent);
         } else {
-          logger.globe.debug(`Loading... ${progress.loaded} bytes`);
+          console.log(`[EarthInner] Loading... ${progress.loaded} bytes`);
         }
       },
       (error) => {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        logger.globe.error('GLB load FAILED', { error: errorMsg });
+        console.error('[EarthInner] GLB load FAILED:', errorMsg);
         onLoadError?.(errorMsg);
       }
     );
 
     // Sync cycle
     syncCetusCycle().then((source) => {
-      logger.globe.info('Cycle synced', { source });
+      console.log('[EarthInner] Cycle synced from:', source);
     });
 
     let lastIsDay: boolean | null = null;
-    let lastEmissiveIntensity: number | null = null;
 
-    // Simple check: if screen width <= 1440px, disable spinning and throttle rendering
     const isSmallScreen = window.innerWidth <= 1440;
-    const reduceMotion = getReduceMotionEnabled();
-    logger.globe.info('Render mode configured', {
-      screenWidth: window.innerWidth,
-      isSmallScreen,
-      reduceMotion,
-    });
+    console.log('[EarthInner] Screen width:', window.innerWidth, '| Small screen mode:', isSmallScreen);
 
-    // On small screens: render once per second instead of 60fps
-    // On large screens: full 60fps animation with globe spin
     let animationId: number | null = null;
 
     const renderFrame = () => {
       const state = getCetusCycleState();
 
-      // Only spin the globe on large screens and when reduce motion is off
-      if (!isSmallScreen && !reduceMotion) {
+      if (!isSmallScreen) {
         earthGroup.rotation.y += 0.0005;
       }
 
@@ -176,22 +183,18 @@ export default function EarthGlobeInner({
         Math.cos(sunAngle) * 400
       );
 
+      // City lights intensity based on darkness
       const darkness = sunAngle / Math.PI;
-      const newEmissiveIntensity = darkness * 2;
+      const cityLightIntensity = Math.pow(darkness, 1.5) * 6.0;
 
-      // Only update materials when emissive intensity changes by >0.01
-      if (lastEmissiveIntensity === null || Math.abs(newEmissiveIntensity - lastEmissiveIntensity) > 0.01) {
-        lastEmissiveIntensity = newEmissiveIntensity;
-        earthMaterials.forEach((mat) => {
-          if (mat.emissiveMap) {
-            mat.emissiveIntensity = newEmissiveIntensity;
-            mat.emissive.setHex(0xffcc66);
-          }
-        });
-      }
+      earthMaterials.forEach((mat) => {
+        if (mat.emissiveMap) {
+          mat.emissiveIntensity = cityLightIntensity;
+        }
+      });
 
       if (lastIsDay !== state.isDay) {
-        logger.cetus.info(`${state.isDay ? 'DAY' : 'NIGHT'} cycle started`);
+        console.log(`[EarthInner] ${state.isDay ? 'DAY' : 'NIGHT'} started`);
         lastIsDay = state.isDay;
       }
 
@@ -199,19 +202,13 @@ export default function EarthGlobeInner({
     };
 
     if (isSmallScreen) {
-      // Small screen: render once immediately, then update every second
       renderFrame();
       const intervalId = setInterval(renderFrame, 1000);
       sceneRef.current.animationId = intervalId as unknown as number;
     } else {
-      // Large screen: 30fps animation loop (skip every other frame)
-      let frameCount = 0;
       const animate = () => {
         animationId = requestAnimationFrame(animate);
-        frameCount++;
-        if (frameCount % 2 === 0) {
-          renderFrame();
-        }
+        renderFrame();
       };
       animate();
     }
