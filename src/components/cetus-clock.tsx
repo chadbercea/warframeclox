@@ -64,7 +64,7 @@ export function CetusClock() {
   const { isEnabled: reduceMotionEnabled } = useReduceMotion();
   const { showToast } = useToast();
 
-  // Track if initial toast has been shown
+  // Track if initial page load toast has been shown
   const hasShownInitialToastRef = useRef(false);
 
   // Neutralize parallax when reduce motion is enabled
@@ -87,14 +87,16 @@ export function CetusClock() {
       const cycleStart = Date.now() - elapsed;
       setCycleStartTimestamp(cycleStart);
 
-      // Show initial load toast with current cycle status (only once)
+      // Show initial page load toast with current cycle status (only once)
       if (!hasShownInitialToastRef.current) {
         hasShownInitialToastRef.current = true;
         showToast({
-          title: state.isDay ? 'Day on the Plains' : 'Night on the Plains',
-          message: `${state.timeLeftFormatted} remaining until ${state.isDay ? 'nightfall' : 'dawn'}.`,
+          title: state.isDay ? 'The Light Returns' : 'The Long Dark Begins',
+          message: state.isDay
+            ? 'Unum\'s radiance graces the Plains once more. The Eidolons retreat to slumber beneath the waters.'
+            : 'The Sentient spirits rise from their ancient tombs. Tread carefully, Tenno—the night belongs to the Eidolons.',
           icon: state.isDay ? 'sun' : 'moon',
-          duration: 6000,
+          duration: 10000,
         });
       }
     };
@@ -144,19 +146,25 @@ export function CetusClock() {
 
   // Play sound and show toast when cycle transitions from day to night or night to day
   useEffect(() => {
-    // Skip if not yet initialized (prevents sound/toast on initial page load)
+    // Don't do anything until we have synced with the API (cycleStartTimestamp is set)
+    // This prevents false "transitions" when the initial state corrects itself
+    if (cycleStartTimestamp === null) {
+      return;
+    }
+
+    // Skip the first run after API sync - just record the initial state
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
       prevIsDayRef.current = isDay;
       return;
     }
 
-    // Only trigger if there was a real transition
+    // Only trigger if there was a real transition (not initial load)
     if (prevIsDayRef.current !== null && prevIsDayRef.current !== isDay) {
       console.log('[CetusClock] Cycle transition detected:', prevIsDayRef.current ? 'day' : 'night', '->', isDay ? 'day' : 'night');
       playSound('cycleTransition');
 
-      // Show toast notification for cycle transition (always show, independent of browser notifications)
+      // Show toast notification for cycle transition
       showToast({
         title: isDay ? 'The Light Returns' : 'The Long Dark Begins',
         message: isDay
@@ -167,7 +175,7 @@ export function CetusClock() {
       });
     }
     prevIsDayRef.current = isDay;
-  }, [isDay, playSound, showToast]);
+  }, [isDay, cycleStartTimestamp, playSound, showToast]);
 
   // Slow counter-clockwise starburst rotation (120 seconds per full rotation)
   useEffect(() => {

@@ -302,14 +302,16 @@ export function FloatingMenu() {
           {isSupported && (
             <button
               onClick={() => {
+                // Capture new state before toggle happens
+                const willBeEnabled = !notificationsEnabled;
                 toggleNotifications();
-                // Show toast for notification toggle (will show opposite state since toggle happens first)
+                // Show toast with the NEW state
                 showToast({
-                  title: notificationsEnabled ? 'NOTIFICATIONS DISABLED' : 'NOTIFICATIONS ENABLED',
-                  message: notificationsEnabled
-                    ? 'Browser notifications have been turned off.'
-                    : 'You will receive browser alerts before cycle transitions.',
-                  icon: notificationsEnabled ? 'moon' : 'sun',
+                  title: willBeEnabled ? 'NOTIFICATIONS ENABLED' : 'NOTIFICATIONS DISABLED',
+                  message: willBeEnabled
+                    ? 'You will receive browser alerts before cycle transitions.'
+                    : 'Browser notifications have been turned off.',
+                  icon: willBeEnabled ? 'sun' : 'moon',
                 });
               }}
               disabled={permission === 'denied'}
@@ -378,14 +380,16 @@ export function FloatingMenu() {
           {/* Sound Toggle */}
           <button
             onClick={() => {
+              // Capture new state before toggle happens
+              const willBeEnabled = !soundEnabled;
               toggleSound();
-              // Show toast for sound toggle (will show opposite state since toggle happens first)
+              // Show toast with the NEW state
               showToast({
-                title: soundEnabled ? 'SOUND DISABLED' : 'SOUND ENABLED',
-                message: soundEnabled
-                  ? 'Audio effects have been muted.'
-                  : 'You will hear audio cues during cycle transitions.',
-                icon: soundEnabled ? 'moon' : 'sun',
+                title: willBeEnabled ? 'SOUND ENABLED' : 'SOUND DISABLED',
+                message: willBeEnabled
+                  ? 'You will hear audio cues during cycle transitions.'
+                  : 'Audio effects have been muted.',
+                icon: willBeEnabled ? 'sun' : 'moon',
               });
             }}
             className="w-full flex items-center justify-between p-2 rounded-lg transition-all duration-200 mt-2"
