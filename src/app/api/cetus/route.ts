@@ -5,6 +5,7 @@ import { kv } from '@vercel/kv';
 const CETUS_DAY_MS = 100 * 60 * 1000; // 100 minutes
 const CETUS_CYCLE_MS = 150 * 60 * 1000; // 150 minutes total
 const CACHE_MAX_AGE_MS = 60 * 1000; // Consider cache stale after 60 seconds
+const MIN_API_INTERVAL_MS = 30 * 1000; // Don't hit Warframe API more than once per 30 seconds
 
 interface CachedCetusData {
   cycleStart: number;
@@ -21,6 +22,10 @@ interface WorldStateResponse {
   }>;
 }
 
+// In-memory cache for when KV is unavailable (persists per Edge function instance)
+let memoryCache: CachedCetusData | null = null;
+let lastApiCall: number = 0;
+
 // Fallback calculation when no data available
 function calculateFromReference(referenceStart: number) {
   const now = Date.now();
@@ -32,11 +37,31 @@ function calculateFromReference(referenceStart: number) {
   return { cycleStart: currentCycleStart, cycleEnd: currentCycleEnd, isDay };
 }
 
-// Fetch directly from Warframe API (works from server, blocked in production by CORS from browser)
+// Helper to calculate state from cycle start
+function calculateState(cycleStart: number): boolean {
+  const now = Date.now();
+  const elapsed = now - cycleStart;
+  const positionInCycle = elapsed >= 0 
+    ? elapsed % CETUS_CYCLE_MS 
+    : CETUS_CYCLE_MS + (elapsed % CETUS_CYCLE_MS);
+  return positionInCycle < CETUS_DAY_MS;
+}
+
+// Fetch directly from Warframe API with rate limiting
 async function fetchFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
+  const now = Date.now();
+  
+  // Rate limit: don't call API more than once per 30 seconds
+  if (now - lastApiCall < MIN_API_INTERVAL_MS) {
+    console.log('[Cetus API] Rate limited - using cache/fallback');
+    return null;
+  }
+  
+  lastApiCall = now;
+  
   try {
     const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
-      next: { revalidate: 30 }, // Edge cache for 30 seconds
+      next: { revalidate: 60 }, // Edge cache for 60 seconds
     });
 
     if (!response.ok) {
@@ -67,26 +92,37 @@ export async function GET() {
   const startTime = Date.now();
   const FALLBACK_REFERENCE = 1766246853909; // Known cycle start reference
 
-  // Helper to calculate state from cycle start
-  const calculateState = (cycleStart: number) => {
-    const now = Date.now();
-    const elapsed = now - cycleStart;
-    const positionInCycle = elapsed >= 0 
-      ? elapsed % CETUS_CYCLE_MS 
-      : CETUS_CYCLE_MS + (elapsed % CETUS_CYCLE_MS);
-    return positionInCycle < CETUS_DAY_MS;
-  };
+  // 1. Try memory cache first (fastest, no external calls)
+  if (memoryCache) {
+    const age = Date.now() - memoryCache.syncedAt;
+    if (age < CACHE_MAX_AGE_MS) {
+      const isDay = calculateState(memoryCache.cycleStart);
+      return Response.json({
+        cycleStart: memoryCache.cycleStart,
+        cycleEnd: memoryCache.cycleEnd,
+        isDay,
+        state: isDay ? 'day' : 'night',
+        syncedAt: memoryCache.syncedAt,
+        fetchedAt: Date.now(),
+        source: 'memory-cache',
+        cacheAge: age,
+        responseTime: Date.now() - startTime,
+      });
+    }
+  }
 
-  // 1. Try to read from Vercel KV cache
+  // 2. Try Vercel KV cache
   try {
     const cached = await kv.get<CachedCetusData>('cetus_cycle');
     
     if (cached) {
       const age = Date.now() - cached.syncedAt;
-      const needsRefresh = age > CACHE_MAX_AGE_MS;
       
-      // If cache is fresh, return it
-      if (!needsRefresh) {
+      // Update memory cache
+      memoryCache = cached;
+      
+      // If KV cache is fresh, return it
+      if (age < CACHE_MAX_AGE_MS) {
         const isDay = calculateState(cached.cycleStart);
         return Response.json({
           cycleStart: cached.cycleStart,
@@ -105,7 +141,7 @@ export async function GET() {
       const wfData = await fetchFromWarframeApi();
       
       if (wfData) {
-        // Got fresh data - update KV cache
+        // Got fresh data - update both caches
         const now = Date.now();
         const newData: CachedCetusData = {
           cycleStart: wfData.cycleStart,
@@ -114,6 +150,7 @@ export async function GET() {
           syncedAt: now,
         };
         
+        memoryCache = newData;
         await kv.set('cetus_cycle', newData, { ex: 3600 }); // 1 hour TTL
         
         const isDay = calculateState(wfData.cycleStart);
@@ -129,7 +166,7 @@ export async function GET() {
         });
       }
 
-      // Warframe API failed - return stale cache
+      // Warframe API failed/rate-limited - return stale cache
       const isDay = calculateState(cached.cycleStart);
       return Response.json({
         cycleStart: cached.cycleStart,
@@ -140,12 +177,11 @@ export async function GET() {
         fetchedAt: Date.now(),
         source: 'kv-cache-stale',
         cacheAge: age,
-        warning: 'Using stale cache - Warframe API unavailable',
         responseTime: Date.now() - startTime,
       });
     }
 
-    // No cache - try to fetch from Warframe API
+    // No KV cache - try to fetch from Warframe API
     const wfData = await fetchFromWarframeApi();
     
     if (wfData) {
@@ -157,6 +193,7 @@ export async function GET() {
         syncedAt: now,
       };
       
+      memoryCache = newData;
       await kv.set('cetus_cycle', newData, { ex: 3600 });
       
       const isDay = calculateState(wfData.cycleStart);
@@ -172,7 +209,7 @@ export async function GET() {
       });
     }
 
-    // No cache, no Warframe API - use fallback
+    // No cache, no Warframe API - use fallback calculation
     const calculated = calculateFromReference(FALLBACK_REFERENCE);
     return Response.json({
       cycleStart: calculated.cycleStart,
@@ -181,32 +218,90 @@ export async function GET() {
       state: calculated.isDay ? 'day' : 'night',
       fetchedAt: Date.now(),
       source: 'fallback',
-      warning: 'Using calculated fallback - no cache or API available',
       responseTime: Date.now() - startTime,
     });
 
-  } catch (error) {
-    // KV error - try direct Warframe API fetch
-    console.error('[Cetus API] KV error:', error);
+  } catch (kvError) {
+    // KV unavailable - use memory cache or fetch with rate limiting
+    console.error('[Cetus API] KV error:', kvError);
     
+    // Check memory cache first
+    if (memoryCache) {
+      const age = Date.now() - memoryCache.syncedAt;
+      // Use memory cache even if stale when KV is down
+      const isDay = calculateState(memoryCache.cycleStart);
+      
+      // Only try API if memory cache is very stale (> 5 minutes)
+      if (age > 5 * 60 * 1000) {
+        const wfData = await fetchFromWarframeApi();
+        if (wfData) {
+          const now = Date.now();
+          memoryCache = {
+            cycleStart: wfData.cycleStart,
+            cycleEnd: wfData.cycleEnd,
+            isDay: calculateState(wfData.cycleStart),
+            syncedAt: now,
+          };
+          return Response.json({
+            cycleStart: wfData.cycleStart,
+            cycleEnd: wfData.cycleEnd,
+            isDay: calculateState(wfData.cycleStart),
+            state: calculateState(wfData.cycleStart) ? 'day' : 'night',
+            fetchedAt: now,
+            source: 'warframe-api-direct',
+            responseTime: Date.now() - startTime,
+          });
+        }
+      }
+      
+      return Response.json({
+        cycleStart: memoryCache.cycleStart,
+        cycleEnd: memoryCache.cycleEnd,
+        isDay,
+        state: isDay ? 'day' : 'night',
+        syncedAt: memoryCache.syncedAt,
+        fetchedAt: Date.now(),
+        source: 'memory-cache-stale',
+        cacheAge: age,
+        responseTime: Date.now() - startTime,
+      });
+    }
+    
+    // No memory cache - try API once
     const wfData = await fetchFromWarframeApi();
     
     if (wfData) {
+      const now = Date.now();
+      memoryCache = {
+        cycleStart: wfData.cycleStart,
+        cycleEnd: wfData.cycleEnd,
+        isDay: calculateState(wfData.cycleStart),
+        syncedAt: now,
+      };
+      
       const isDay = calculateState(wfData.cycleStart);
       return Response.json({
         cycleStart: wfData.cycleStart,
         cycleEnd: wfData.cycleEnd,
         isDay,
         state: isDay ? 'day' : 'night',
-        fetchedAt: Date.now(),
+        fetchedAt: now,
         source: 'warframe-api-direct',
-        warning: 'KV unavailable - fetched directly',
         responseTime: Date.now() - startTime,
       });
     }
 
     // Everything failed - use calculation fallback
     const calculated = calculateFromReference(FALLBACK_REFERENCE);
+    
+    // Cache the fallback calculation too
+    memoryCache = {
+      cycleStart: calculated.cycleStart,
+      cycleEnd: calculated.cycleEnd,
+      isDay: calculated.isDay,
+      syncedAt: Date.now(),
+    };
+    
     return Response.json({
       cycleStart: calculated.cycleStart,
       cycleEnd: calculated.cycleEnd,
@@ -214,7 +309,6 @@ export async function GET() {
       state: calculated.isDay ? 'day' : 'night',
       fetchedAt: Date.now(),
       source: 'fallback',
-      error: error instanceof Error ? error.message : 'KV and API unavailable',
       responseTime: Date.now() - startTime,
     });
   }
@@ -249,21 +343,23 @@ export async function POST(request: Request) {
     }
 
     // Calculate current state
-    const elapsed = now - cycleStart;
-    const positionInCycle = elapsed >= 0 
-      ? elapsed % CETUS_CYCLE_MS 
-      : CETUS_CYCLE_MS + (elapsed % CETUS_CYCLE_MS);
-    const isDay = positionInCycle < CETUS_DAY_MS;
+    const isDay = calculateState(cycleStart);
 
-    // Store in KV with 1 hour TTL
+    // Update memory cache immediately
     const data: CachedCetusData = {
       cycleStart,
       cycleEnd,
       isDay,
       syncedAt: now,
     };
+    memoryCache = data;
 
-    await kv.set('cetus_cycle', data, { ex: 3600 });
+    // Try to store in KV (may fail if not configured)
+    try {
+      await kv.set('cetus_cycle', data, { ex: 3600 });
+    } catch {
+      console.log('[Cetus API] KV write failed, using memory cache only');
+    }
 
     return Response.json({
       success: true,
