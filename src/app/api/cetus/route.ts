@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 const CETUS_DAY_MS = 100 * 60 * 1000; // 100 minutes
 const CETUS_CYCLE_MS = 150 * 60 * 1000; // 150 minutes total
+const STALE_THRESHOLD_MS = 60 * 60 * 1000; // Refresh if data > 1 hour old
 
 interface WorldStateResponse {
   SyndicateMissions?: Array<{
@@ -14,22 +15,12 @@ interface WorldStateResponse {
   }>;
 }
 
-// Calculate cycle state from a reference start time
-function calculateFromReference(referenceStart: number) {
-  const now = Date.now();
-  const timeSinceReference = now - referenceStart;
-  const cyclePos = ((timeSinceReference % CETUS_CYCLE_MS) + CETUS_CYCLE_MS) % CETUS_CYCLE_MS;
-  const currentCycleStart = now - cyclePos;
-  const currentCycleEnd = currentCycleStart + CETUS_CYCLE_MS;
-  const isDay = cyclePos < CETUS_DAY_MS;
-  return { cycleStart: currentCycleStart, cycleEnd: currentCycleEnd, isDay };
-}
-
-// Fetch data from Warframe API (only called if Edge Config is empty)
+// Fetch fresh data from Warframe API (server-side, no CORS)
 async function fetchFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
   try {
     const response = await fetch('https://content.warframe.com/dynamic/worldState.php', {
       headers: { 'User-Agent': 'WarframeClox/1.0' },
+      cache: 'no-store',
     });
 
     if (!response.ok) return null;
@@ -50,8 +41,8 @@ async function fetchFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: n
   }
 }
 
-// Update Edge Config (only called once to seed data)
-async function seedEdgeConfig(cycleStart: number, cycleEnd: number): Promise<boolean> {
+// Update Edge Config with fresh data
+async function updateEdgeConfig(cycleStart: number, cycleEnd: number): Promise<boolean> {
   const token = process.env.VERCEL_ACCESS_TOKEN;
   const configId = process.env.EDGE_CONFIG_ID;
 
@@ -82,69 +73,104 @@ async function seedEdgeConfig(cycleStart: number, cycleEnd: number): Promise<boo
 export async function GET() {
   const startTime = Date.now();
   const now = Date.now();
-  const FALLBACK_REFERENCE = 1766039879789; // Hardcoded fallback
 
   try {
     // 1. Read from Edge Config
     const cetusStart = await get<number>('cetus_start');
+    const cetusEnd = await get<number>('cetus_end');
     const syncedAt = await get<number>('synced_at');
 
-    if (cetusStart) {
-      // Got data - calculate and return
-      const calculated = calculateFromReference(cetusStart);
+    const isStale = !syncedAt || (now - syncedAt) > STALE_THRESHOLD_MS;
+    const hasData = cetusStart && cetusEnd;
+
+    // 2. If stale or no data, fetch fresh from Warframe API
+    if (isStale || !hasData) {
+      const freshData = await fetchFromWarframeApi();
+
+      if (freshData) {
+        // Update Edge Config in background (don't wait)
+        updateEdgeConfig(freshData.cycleStart, freshData.cycleEnd);
+
+        // Return fresh data directly from API
+        return Response.json({
+          cycleStart: freshData.cycleStart,
+          cycleEnd: freshData.cycleEnd,
+          isDay: (now - freshData.cycleStart) < CETUS_DAY_MS,
+          state: (now - freshData.cycleStart) < CETUS_DAY_MS ? 'day' : 'night',
+          fetchedAt: now,
+          source: 'warframe-api-fresh',
+          syncedAt: now,
+          responseTime: Date.now() - startTime,
+        });
+      }
+
+      // API failed but we have stale data - use it
+      if (hasData) {
+        return Response.json({
+          cycleStart: cetusStart,
+          cycleEnd: cetusEnd,
+          isDay: (now - cetusStart!) < CETUS_DAY_MS,
+          state: (now - cetusStart!) < CETUS_DAY_MS ? 'day' : 'night',
+          fetchedAt: now,
+          source: 'edge-config-stale',
+          syncedAt,
+          warning: 'API fetch failed, using stale data',
+          responseTime: Date.now() - startTime,
+        });
+      }
+
+      // No data at all - use hardcoded fallback
+      const FALLBACK_START = 1766246853909;
       return Response.json({
-        cycleStart: calculated.cycleStart,
-        cycleEnd: calculated.cycleEnd,
-        isDay: calculated.isDay,
-        state: calculated.isDay ? 'day' : 'night',
+        cycleStart: FALLBACK_START,
+        cycleEnd: FALLBACK_START + CETUS_CYCLE_MS,
+        isDay: ((now - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS,
+        state: ((now - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS ? 'day' : 'night',
         fetchedAt: now,
-        source: 'edge-config',
-        syncedAt,
+        source: 'fallback',
+        warning: 'No Edge Config data and API failed',
         responseTime: Date.now() - startTime,
       });
     }
 
-    // 2. Edge Config empty - seed it from Warframe API
-    const freshData = await fetchFromWarframeApi();
-
-    if (freshData) {
-      await seedEdgeConfig(freshData.cycleStart, freshData.cycleEnd);
-      const calculated = calculateFromReference(freshData.cycleStart);
-
-      return Response.json({
-        cycleStart: calculated.cycleStart,
-        cycleEnd: calculated.cycleEnd,
-        isDay: calculated.isDay,
-        state: calculated.isDay ? 'day' : 'night',
-        fetchedAt: now,
-        source: 'warframe-api-seeded',
-        syncedAt: now,
-        responseTime: Date.now() - startTime,
-      });
-    }
-
-    // 3. API failed - use fallback
-    const calculated = calculateFromReference(FALLBACK_REFERENCE);
+    // 3. Data is fresh - return it
     return Response.json({
-      cycleStart: calculated.cycleStart,
-      cycleEnd: calculated.cycleEnd,
-      isDay: calculated.isDay,
-      state: calculated.isDay ? 'day' : 'night',
+      cycleStart: cetusStart,
+      cycleEnd: cetusEnd,
+      isDay: (now - cetusStart!) < CETUS_DAY_MS,
+      state: (now - cetusStart!) < CETUS_DAY_MS ? 'day' : 'night',
       fetchedAt: now,
-      source: 'fallback',
+      source: 'edge-config',
+      syncedAt,
       responseTime: Date.now() - startTime,
     });
 
-  } catch {
-    // Edge Config read failed - use fallback
-    const calculated = calculateFromReference(FALLBACK_REFERENCE);
+  } catch (error) {
+    // Edge Config read failed - try API directly
+    const freshData = await fetchFromWarframeApi();
+    
+    if (freshData) {
+      return Response.json({
+        cycleStart: freshData.cycleStart,
+        cycleEnd: freshData.cycleEnd,
+        isDay: (Date.now() - freshData.cycleStart) < CETUS_DAY_MS,
+        state: (Date.now() - freshData.cycleStart) < CETUS_DAY_MS ? 'day' : 'night',
+        fetchedAt: Date.now(),
+        source: 'warframe-api-fallback',
+        responseTime: Date.now() - startTime,
+      });
+    }
+
+    // Everything failed
+    const FALLBACK_START = 1766246853909;
     return Response.json({
-      cycleStart: calculated.cycleStart,
-      cycleEnd: calculated.cycleEnd,
-      isDay: calculated.isDay,
-      state: calculated.isDay ? 'day' : 'night',
-      fetchedAt: now,
+      cycleStart: FALLBACK_START,
+      cycleEnd: FALLBACK_START + CETUS_CYCLE_MS,
+      isDay: ((Date.now() - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS,
+      state: ((Date.now() - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS ? 'day' : 'night',
+      fetchedAt: Date.now(),
       source: 'fallback',
+      error: 'All sources failed',
       responseTime: Date.now() - startTime,
     });
   }
