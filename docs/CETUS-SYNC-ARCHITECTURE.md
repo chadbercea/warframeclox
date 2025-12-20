@@ -2,105 +2,33 @@
 
 ## Overview
 
-This document describes the architecture for fetching Cetus day/night cycle data.
+The Cetus day/night cycle is **deterministic** - it repeats every 150 minutes (100 min day, 50 min night). Once you have a single valid reference timestamp, you can calculate the current state forever using modulo math.
 
-### The Challenge
+## How It Works
 
-Warframe's official API (`api.warframe.com`) blocks requests from datacenter IPs (like Vercel servers), but `content.warframe.com/dynamic/worldState.php` works from servers.
-
-### Solution
-
-We use **Edge Config as a cache** with automatic refresh from the Warframe API:
-
-1. Read cycle reference from Edge Config (ultra-fast, <1ms)
-2. If stale (>2 hours), fetch fresh data from Warframe API
-3. Update Edge Config with fresh data
-4. Calculate current cycle state from reference
+1. **Read reference from Edge Config** (`cetus_start`)
+2. **Calculate current state** using modulo math
+3. **Done** - no repeated API calls needed
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           ARCHITECTURE                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-   CLIENT                     VERCEL EDGE                  WARFRAME API
-     │                            │                             │
-     │  GET /api/cetus            │                             │
-     ├───────────────────────────►│                             │
-     │                            │                             │
-     │                            │  Read from Edge Config      │
-     │                            ├──────┐                      │
-     │                            │      │ cetus_start,         │
-     │                            │◄─────┘ synced_at            │
-     │                            │                             │
-     │                            │  If stale (>2h): fetch      │
-     │                            ├────────────────────────────►│
-     │                            │                             │
-     │                            │◄────────────────────────────┤
-     │                            │  CetusSyndicate data        │
-     │                            │                             │
-     │                            │  Update Edge Config         │
-     │                            ├──────┐                      │
-     │                            │      │ via Vercel API       │
-     │                            │◄─────┘                      │
-     │                            │                             │
-     │  { cycleStart, isDay, ... }│                             │
-     │◄───────────────────────────┤                             │
-```
-
-## Data Flow
-
-### Step 1: Client Requests Cycle Data
-
-The client calls `/api/cetus` on mount and periodically (every 60 seconds).
-
-**File:** `src/lib/cetus-cycle.ts`
-
-```typescript
-const response = await fetch('/api/cetus');
-const data = await response.json();
-// { cycleStart, cycleEnd, isDay, state, source, ... }
-```
-
-### Step 2: Server Reads Edge Config
-
-**File:** `src/app/api/cetus/route.ts`
-
-```typescript
-import { get } from '@vercel/edge-config';
-
-const cetusStart = await get<number>('cetus_start');
-const syncedAt = await get<number>('synced_at');
-```
-
-### Step 3: Auto-Refresh if Stale
-
-If Edge Config data is older than 2 hours, fetch fresh from Warframe API:
-
-```typescript
-if (isStale) {
-  const freshData = await fetchFromWarframeApi();
-  if (freshData) {
-    await updateEdgeConfig(freshData.cycleStart, freshData.cycleEnd);
-  }
-}
-```
-
-### Step 4: Update Edge Config
-
-Uses Vercel REST API to update Edge Config:
-
-```typescript
-await fetch(`https://api.vercel.com/v1/edge-config/${configId}/items`, {
-  method: 'PATCH',
-  headers: { 'Authorization': `Bearer ${token}` },
-  body: JSON.stringify({
-    items: [
-      { operation: 'upsert', key: 'cetus_start', value: cycleStart },
-      { operation: 'upsert', key: 'cetus_end', value: cycleEnd },
-      { operation: 'upsert', key: 'synced_at', value: Date.now() },
-    ],
-  }),
-});
+   CLIENT                     VERCEL EDGE                    EDGE CONFIG
+     │                            │                              │
+     │  GET /api/cetus            │                              │
+     ├───────────────────────────►│                              │
+     │                            │                              │
+     │                            │  get('cetus_start')          │
+     │                            ├─────────────────────────────►│
+     │                            │◄─────────────────────────────┤
+     │                            │  1766039879789               │
+     │                            │                              │
+     │                            │  Calculate: now - ref % 150m │
+     │                            │                              │
+     │  { isDay, timeLeft, ... }  │                              │
+     │◄───────────────────────────┤                              │
 ```
 
 ## Edge Config Data
@@ -113,101 +41,52 @@ await fetch(`https://api.vercel.com/v1/edge-config/${configId}/items`, {
 }
 ```
 
-## API Response Format
+This data is seeded once and used forever. The cycle math is deterministic.
 
-### Warframe `worldState.php` (CetusSyndicate)
+## The Math
 
-```json
-{
-  "Tag": "CetusSyndicate",
-  "Activation": { "$date": { "$numberLong": "1766246853909" } },
-  "Expiry": { "$date": { "$numberLong": "1766255852783" } }
+```typescript
+const CETUS_DAY_MS = 100 * 60 * 1000;    // 100 minutes
+const CETUS_CYCLE_MS = 150 * 60 * 1000;  // 150 minutes total
+
+function calculateFromReference(referenceStart: number) {
+  const now = Date.now();
+  const timeSinceReference = now - referenceStart;
+  const cyclePos = timeSinceReference % CETUS_CYCLE_MS;
+  const isDay = cyclePos < CETUS_DAY_MS;
+  return { isDay };
 }
 ```
 
-### Our `/api/cetus` Response
+## Seeding Edge Config
 
-```json
-{
-  "cycleStart": 1766246853909,
-  "cycleEnd": 1766255852783,
-  "isDay": true,
-  "state": "day",
-  "syncedAt": 1766250000000,
-  "fetchedAt": 1766250001234,
-  "source": "edge-config",
-  "daysSinceSync": 0,
-  "isStale": false,
-  "responseTime": 2
-}
+If Edge Config is empty, the API route fetches once from Warframe and seeds Edge Config:
+
+```typescript
+// Only runs if Edge Config has no data
+const freshData = await fetchFromWarframeApi();
+await seedEdgeConfig(freshData.cycleStart, freshData.cycleEnd);
 ```
 
-### Source Values
+## Manual Re-sync
 
-| Source | Meaning |
-|--------|---------|
-| `edge-config` | Fresh data from Edge Config (<2h old) |
-| `edge-config-stale` | Stale cache (API refresh failed) |
-| `warframe-api` | Fresh data from Warframe API (Edge Config updated) |
-| `warframe-api-no-cache` | Fresh API data (Edge Config update failed) |
-| `warframe-api-seeded` | First-time seed from API |
-| `warframe-api-direct` | Direct fetch (Edge Config unavailable) |
-| `fallback` | Calculated from hardcoded reference |
-
-## Fallback Chain
-
-| Priority | Source | When Used |
-|----------|--------|-----------|
-| 1 | Edge Config (fresh) | Data exists and <2h old |
-| 2 | Warframe API + update | Edge Config stale, API works |
-| 3 | Edge Config (stale) | API failed, use old cache |
-| 4 | Warframe API direct | Edge Config read failed |
-| 5 | Calculated fallback | Everything failed |
-
-## Environment Setup
-
-### Required for Production
-
-Add these to your Vercel project settings:
-
-```
-EDGE_CONFIG=<from Edge Config dashboard - auto-added>
-EDGE_CONFIG_ID=<your Edge Config ID, e.g., ecfg_xxx>
-VERCEL_ACCESS_TOKEN=<from Vercel account settings>
-```
-
-### Manual Sync Script
-
-If automatic refresh fails, run manually:
+If the clock drifts (shouldn't happen, but just in case):
 
 ```bash
 ./scripts/sync-cetus.sh
 ```
 
-Requires `VERCEL_ACCESS_TOKEN` and `EDGE_CONFIG_ID` in `.env.local`.
+## Environment Variables
 
-## Why This Architecture?
-
-### Advantages
-
-1. **Ultra-fast reads** - Edge Config <1ms globally
-2. **Auto-refresh** - No manual intervention needed
-3. **Reliable fallbacks** - Multiple layers of backup
-4. **No CORS issues** - Server-side fetch only
-5. **Existing infrastructure** - Uses Edge Config you already have
-
-### Trade-offs
-
-1. **2-hour staleness** - Data refreshes every 2 hours max
-2. **Requires env vars** - Need VERCEL_ACCESS_TOKEN for updates
-3. **API dependency** - Warframe API must be accessible from Vercel
+| Variable | Purpose |
+|----------|---------|
+| `EDGE_CONFIG` | Auto-added by Vercel when Edge Config created |
+| `EDGE_CONFIG_ID` | For writing to Edge Config (`ecfg_xxx`) |
+| `VERCEL_ACCESS_TOKEN` | For writing to Edge Config |
 
 ## For AI Agents
 
-When working on this codebase:
-
-1. **DO NOT** add client-side fetches to Warframe APIs (CORS blocked)
-2. **DO** use Edge Config for caching (already set up)
-3. **DO** maintain the fallback chain
-4. **DO NOT** replace Edge Config with KV (Edge Config is already configured)
-5. **DO NOT** add external CORS proxies (unreliable)
+1. **DO NOT** add periodic API refreshes - the math is deterministic
+2. **DO NOT** replace Edge Config with KV
+3. **DO** use the existing `cetus_start` reference for all calculations
+4. **DO** keep the fallback calculation as last resort
