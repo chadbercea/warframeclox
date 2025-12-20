@@ -3,8 +3,11 @@
  * - Full payload → Vercel Blob (for future clocks)
  * - Cetus data → Edge Config (for Cetus clock)
  * 
- * Run: npx tsx scripts/sync-worldstate.ts
+ * Run: npm run sync
  */
+
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 import { put } from '@vercel/blob';
 
