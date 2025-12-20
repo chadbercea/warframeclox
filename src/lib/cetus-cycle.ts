@@ -8,17 +8,15 @@ const CETUS_DAY_DURATION = 100 * 60 * 1000; // 100 minutes in ms
 const CETUS_NIGHT_DURATION = 50 * 60 * 1000; // 50 minutes in ms
 const CETUS_CYCLE_DURATION = CETUS_DAY_DURATION + CETUS_NIGHT_DURATION; // 150 minutes in ms
 
-// LocalStorage key for client-synced timestamp
+// LocalStorage key for cached data
 const STORAGE_KEY = 'cetus_cycle_reference';
 const STORAGE_SYNCED_AT_KEY = 'cetus_synced_at';
 
-// Cached API data for cycle sync
+// Cached API data
 let cachedCycleStart: number | null = null;
 let lastFetchTime: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // Refresh API data every 5 minutes
+const CACHE_DURATION = 60 * 1000; // Refresh API data every 60 seconds
 
-// Track if we've already attempted server sync this session
-let hasAttemptedServerSync = false;
 
 export interface CetusCycleState {
   isDay: boolean;
@@ -49,14 +47,6 @@ let syncStatus: SyncStatus = {
 
 export function getSyncStatus(): SyncStatus {
   return syncStatus;
-}
-
-interface WorldStateResponse {
-  SyndicateMissions?: Array<{
-    Tag: string;
-    Activation: { $date: { $numberLong: string } };
-    Expiry: { $date: { $numberLong: string } };
-  }>;
 }
 
 // Load cached reference from localStorage
@@ -90,74 +80,14 @@ function saveToStorage(cycleStart: number): void {
   }
 }
 
-// Submit sync data to server (updates Edge Config for all users)
-async function submitSyncToServer(cycleStart: number, cycleEnd: number): Promise<boolean> {
-  if (hasAttemptedServerSync) return false; // Only attempt once per session
-  hasAttemptedServerSync = true;
 
-  try {
-    const response = await fetch('/api/sync-cetus', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activation: cycleStart, expiry: cycleEnd }),
-    });
-
-    if (!response.ok) {
-      logger.cetus.warn('Server sync failed', { status: response.status });
-      return false;
-    }
-
-    const result = await response.json();
-    logger.cetus.info('Server sync result', result);
-    return result.success && result.action === 'updated';
-  } catch (error) {
-    logger.cetus.warn('Server sync error', { error });
-    return false;
-  }
-}
-
-// Fetch Warframe API directly from browser (user's residential IP is not blocked)
-async function fetchDirectFromWarframeApi(): Promise<{ cycleStart: number; cycleEnd: number } | null> {
-  if (typeof window === 'undefined') return null; // Only run client-side
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    // Direct browser fetch - user's residential IP is not blocked by Warframe API
-    const response = await fetch('https://api.warframe.com/cdn/worldState.php', {
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    clearTimeout(timeout);
-
-    if (!response.ok) return null;
-
-    const data: WorldStateResponse = await response.json();
-    const cetusMission = data.SyndicateMissions?.find(m => m.Tag === 'CetusSyndicate');
-
-    if (cetusMission?.Activation?.$date?.$numberLong && cetusMission?.Expiry?.$date?.$numberLong) {
-      const cycleStart = parseInt(cetusMission.Activation.$date.$numberLong, 10);
-      const cycleEnd = parseInt(cetusMission.Expiry.$date.$numberLong, 10);
-
-      // Validate timestamps
-      if (cycleStart > 1577836800000 && cycleEnd > cycleStart) {
-        logger.cetus.info('Direct API fetch successful', { cycleStart, cycleEnd });
-
-        // Submit to server to update Edge Config for all users
-        submitSyncToServer(cycleStart, cycleEnd);
-
-        return { cycleStart, cycleEnd };
-      }
-    }
-  } catch {
-    // Expected to fail (CORS/blocked) - silently fall back to Edge Config
-  }
-  return null;
-}
-
-// Fetch cycle data via our API route (server-side, uses Edge Config)
-export async function fetchCetusCycleFromApi(): Promise<{ cycleStart: number; cycleEnd: number; source?: string } | null> {
+// Fetch cycle data from our API route
+// Server handles KV caching and Warframe API fetching
+export async function fetchCetusCycleFromApi(): Promise<{ 
+  cycleStart: number; 
+  cycleEnd: number; 
+  source?: string;
+} | null> {
   try {
     const response = await fetch('/api/cetus');
     if (!response.ok) return null;
@@ -167,14 +97,18 @@ export async function fetchCetusCycleFromApi(): Promise<{ cycleStart: number; cy
     // Update sync status from API response
     syncStatus = {
       source: data.source || 'unknown',
-      isStale: data.isStale || false,
-      daysSinceSync: data.daysSinceSync ?? null,
+      isStale: data.source === 'fallback' || data.source?.includes('stale'),
+      daysSinceSync: data.cacheAge ? Math.floor(data.cacheAge / (24 * 60 * 60 * 1000)) : null,
       warning: data.warning || null,
       error: data.error || null,
     };
 
     if (data.cycleStart && data.cycleEnd) {
-      return { cycleStart: data.cycleStart, cycleEnd: data.cycleEnd, source: data.source };
+      return { 
+        cycleStart: data.cycleStart, 
+        cycleEnd: data.cycleEnd, 
+        source: data.source,
+      };
     }
   } catch (error) {
     logger.cetus.error('Failed to fetch Cetus cycle from API', { error });
@@ -190,42 +124,56 @@ export async function fetchCetusCycleFromApi(): Promise<{ cycleStart: number; cy
 }
 
 // Sync with API (call this periodically)
-// Priority: 1) Direct browser fetch 2) Server API 3) LocalStorage 4) Hardcoded fallback
+// Server handles the Warframe API fetching and KV caching
 export async function syncCetusCycle(): Promise<string> {
   const now = Date.now();
+  
+  // Use in-memory cache if fresh
   if (now - lastFetchTime < CACHE_DURATION && cachedCycleStart !== null) {
-    return 'cached'; // Use in-memory cached data
+    return 'cached';
   }
 
-  // 1. Try direct browser fetch to Warframe API (user's IP isn't blocked)
-  const directData = await fetchDirectFromWarframeApi();
-  if (directData) {
-    cachedCycleStart = directData.cycleStart;
-    lastFetchTime = now;
-    saveToStorage(directData.cycleStart);
-    return 'direct-api';
-  }
-
-  // 2. Try server API (Edge Config or fallback)
+  // Fetch from our API (server handles KV + Warframe API)
   const apiData = await fetchCetusCycleFromApi();
+  
   if (apiData) {
     cachedCycleStart = apiData.cycleStart;
     lastFetchTime = now;
-    if (apiData.source !== 'calculated') {
+    
+    // Save to localStorage if not from fallback
+    if (apiData.source !== 'fallback') {
       saveToStorage(apiData.cycleStart);
     }
-    return apiData.source || 'server-api';
+
+    return apiData.source || 'api';
   }
 
-  // 3. Try localStorage cache
+  // Try localStorage cache
   const stored = loadFromStorage();
   if (stored) {
     cachedCycleStart = stored.cycleStart;
     lastFetchTime = now;
+    
+    syncStatus = {
+      source: 'localStorage',
+      isStale: true,
+      daysSinceSync: Math.floor((now - stored.syncedAt) / (24 * 60 * 60 * 1000)),
+      warning: 'Using cached data',
+      error: null,
+    };
+    
     return 'localStorage';
   }
 
-  // 4. Will use hardcoded fallback in getCetusCycleState
+  // Will use hardcoded fallback in getCetusCycleState
+  syncStatus = {
+    source: 'fallback',
+    isStale: true,
+    daysSinceSync: null,
+    warning: 'Using calculated fallback',
+    error: null,
+  };
+  
   return 'fallback';
 }
 
@@ -248,8 +196,7 @@ export function getCetusCycleState(now: Date = new Date()): CetusCycleState {
 
   // Fallback: Use calculation based on known cycle pattern
   // The cycle repeats every 150 minutes from a known reference
-  // Using verified cycle start from Dec 13, 2025 API response
-  const FALLBACK_EPOCH = 1765688923671;
+  const FALLBACK_EPOCH = 1766246853909; // Updated reference point
   const timeSinceEpoch = currentTime - FALLBACK_EPOCH;
   const positionInCycle = ((timeSinceEpoch % CETUS_CYCLE_DURATION) + CETUS_CYCLE_DURATION) % CETUS_CYCLE_DURATION;
 

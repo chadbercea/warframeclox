@@ -52,7 +52,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' https://api.warframe.com https://*.posthog.com https://*.i.posthog.com",
+              "connect-src 'self' https://api.warframe.com https://api.allorigins.win https://*.posthog.com https://*.i.posthog.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
