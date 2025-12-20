@@ -1,5 +1,6 @@
 #!/bin/bash
-# Sync Cetus cycle data from Warframe API to Vercel Edge Config
+# Sync Warframe worldState to Vercel Edge Config
+# Stores full payload + extracts Cetus cycle data
 # Run this locally when you notice timer drift
 
 set -e
@@ -21,9 +22,9 @@ if [ -z "$EDGE_CONFIG_ID" ]; then
   exit 1
 fi
 
-echo "📡 Fetching Cetus data from Warframe API..."
+echo "📡 Fetching worldState from Warframe API..."
 
-# Fetch and extract Cetus data
+# Fetch full worldState payload
 RESPONSE=$(curl -sL "https://api.warframe.com/cdn/worldState.php")
 
 if [ -z "$RESPONSE" ]; then
@@ -31,7 +32,11 @@ if [ -z "$RESPONSE" ]; then
   exit 1
 fi
 
-# Extract CetusSyndicate data using jq
+SYNCED_AT=$(date +%s)000
+
+echo "✅ Got worldState payload ($(echo "$RESPONSE" | wc -c | tr -d ' ') bytes)"
+
+# Extract CetusSyndicate data
 CETUS_DATA=$(echo "$RESPONSE" | jq -r '.SyndicateMissions[] | select(.Tag=="CetusSyndicate")')
 
 if [ -z "$CETUS_DATA" ]; then
@@ -41,21 +46,26 @@ fi
 
 ACTIVATION=$(echo "$CETUS_DATA" | jq -r '.Activation."$date"."$numberLong"')
 EXPIRY=$(echo "$CETUS_DATA" | jq -r '.Expiry."$date"."$numberLong"')
-SYNCED_AT=$(date +%s)000
 
+echo ""
 echo "✅ Cetus cycle data:"
 echo "   Activation: $ACTIVATION"
 echo "   Expiry:     $EXPIRY"
-echo "   Synced at:  $SYNCED_AT"
+
+# Escape the JSON payload for storage
+ESCAPED_PAYLOAD=$(echo "$RESPONSE" | jq -c '.')
 
 echo ""
 echo "📤 Updating Edge Config..."
 
+# Store full payload + Cetus-specific data
 RESULT=$(curl -s -X PATCH "https://api.vercel.com/v1/edge-config/$EDGE_CONFIG_ID/items" \
   -H "Authorization: Bearer $VERCEL_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
     \"items\": [
+      {\"operation\": \"upsert\", \"key\": \"worldstate_payload\", \"value\": $ESCAPED_PAYLOAD},
+      {\"operation\": \"upsert\", \"key\": \"worldstate_synced_at\", \"value\": $SYNCED_AT},
       {\"operation\": \"upsert\", \"key\": \"cetus_start\", \"value\": $ACTIVATION},
       {\"operation\": \"upsert\", \"key\": \"cetus_end\", \"value\": $EXPIRY},
       {\"operation\": \"upsert\", \"key\": \"synced_at\", \"value\": $SYNCED_AT}
@@ -64,6 +74,11 @@ RESULT=$(curl -s -X PATCH "https://api.vercel.com/v1/edge-config/$EDGE_CONFIG_ID
 
 if echo "$RESULT" | grep -q '"status":"ok"'; then
   echo "✅ Edge Config updated successfully!"
+  echo "   - worldstate_payload (full JSON)"
+  echo "   - worldstate_synced_at"
+  echo "   - cetus_start"
+  echo "   - cetus_end"
+  echo "   - synced_at"
   echo ""
   echo "🔄 Verify at: https://warframeclox.vercel.app/api/cetus"
 else
