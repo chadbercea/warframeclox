@@ -91,12 +91,15 @@ export async function GET() {
         // Update Edge Config in background (don't wait)
         updateEdgeConfig(freshData.cycleStart, freshData.cycleEnd);
 
-        // Return fresh data directly from API
+        // Fresh API data = actual current cycle timestamps
+        const timeInCycle = now - freshData.cycleStart;
+        const isDay = timeInCycle >= 0 && timeInCycle < CETUS_DAY_MS;
+
         return Response.json({
           cycleStart: freshData.cycleStart,
           cycleEnd: freshData.cycleEnd,
-          isDay: (now - freshData.cycleStart) < CETUS_DAY_MS,
-          state: (now - freshData.cycleStart) < CETUS_DAY_MS ? 'day' : 'night',
+          isDay,
+          state: isDay ? 'day' : 'night',
           fetchedAt: now,
           source: 'warframe-api-fresh',
           syncedAt: now,
@@ -104,72 +107,77 @@ export async function GET() {
         });
       }
 
-      // API failed but we have stale data - use it
-      if (hasData) {
-        return Response.json({
-          cycleStart: cetusStart,
-          cycleEnd: cetusEnd,
-          isDay: (now - cetusStart!) < CETUS_DAY_MS,
-          state: (now - cetusStart!) < CETUS_DAY_MS ? 'day' : 'night',
-          fetchedAt: now,
-          source: 'edge-config-stale',
-          syncedAt,
-          warning: 'API fetch failed, using stale data',
-          responseTime: Date.now() - startTime,
-        });
-      }
+      // API failed - calculate from reference (stale or fallback)
+      const reference = hasData ? cetusStart! : 1766246853909;
+      const timeSinceRef = now - reference;
+      const posInCycle = ((timeSinceRef % CETUS_CYCLE_MS) + CETUS_CYCLE_MS) % CETUS_CYCLE_MS;
+      const currentCycleStart = now - posInCycle;
+      const currentCycleEnd = currentCycleStart + CETUS_CYCLE_MS;
+      const isDay = posInCycle < CETUS_DAY_MS;
 
-      // No data at all - use hardcoded fallback
-      const FALLBACK_START = 1766246853909;
       return Response.json({
-        cycleStart: FALLBACK_START,
-        cycleEnd: FALLBACK_START + CETUS_CYCLE_MS,
-        isDay: ((now - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS,
-        state: ((now - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS ? 'day' : 'night',
+        cycleStart: currentCycleStart,
+        cycleEnd: currentCycleEnd,
+        isDay,
+        state: isDay ? 'day' : 'night',
         fetchedAt: now,
-        source: 'fallback',
-        warning: 'No Edge Config data and API failed',
+        source: hasData ? 'calculated-from-stale' : 'calculated-fallback',
+        syncedAt: hasData ? syncedAt : null,
+        warning: 'API fetch failed, using calculated values',
         responseTime: Date.now() - startTime,
       });
     }
 
-    // 3. Data is fresh - return it
+    // 3. Data is fresh - use actual timestamps from Edge Config
+    const timeInCycle = now - cetusStart!;
+    const isDay = timeInCycle >= 0 && timeInCycle < CETUS_DAY_MS;
+
     return Response.json({
       cycleStart: cetusStart,
       cycleEnd: cetusEnd,
-      isDay: (now - cetusStart!) < CETUS_DAY_MS,
-      state: (now - cetusStart!) < CETUS_DAY_MS ? 'day' : 'night',
+      isDay,
+      state: isDay ? 'day' : 'night',
       fetchedAt: now,
       source: 'edge-config',
       syncedAt,
       responseTime: Date.now() - startTime,
     });
 
-  } catch (error) {
+  } catch {
     // Edge Config read failed - try API directly
     const freshData = await fetchFromWarframeApi();
     
     if (freshData) {
+      const timeInCycle = Date.now() - freshData.cycleStart;
+      const isDay = timeInCycle >= 0 && timeInCycle < CETUS_DAY_MS;
+
       return Response.json({
         cycleStart: freshData.cycleStart,
         cycleEnd: freshData.cycleEnd,
-        isDay: (Date.now() - freshData.cycleStart) < CETUS_DAY_MS,
-        state: (Date.now() - freshData.cycleStart) < CETUS_DAY_MS ? 'day' : 'night',
+        isDay,
+        state: isDay ? 'day' : 'night',
         fetchedAt: Date.now(),
         source: 'warframe-api-fallback',
         responseTime: Date.now() - startTime,
       });
     }
 
-    // Everything failed
-    const FALLBACK_START = 1766246853909;
+    // Everything failed - calculate from hardcoded reference
+    const FALLBACK_REF = 1766246853909;
+    const now2 = Date.now();
+    const timeSinceRef = now2 - FALLBACK_REF;
+    const posInCycle = ((timeSinceRef % CETUS_CYCLE_MS) + CETUS_CYCLE_MS) % CETUS_CYCLE_MS;
+    const currentCycleStart = now2 - posInCycle;
+    const currentCycleEnd = currentCycleStart + CETUS_CYCLE_MS;
+    const isDay = posInCycle < CETUS_DAY_MS;
+
     return Response.json({
-      cycleStart: FALLBACK_START,
-      cycleEnd: FALLBACK_START + CETUS_CYCLE_MS,
-      isDay: ((Date.now() - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS,
-      state: ((Date.now() - FALLBACK_START) % CETUS_CYCLE_MS) < CETUS_DAY_MS ? 'day' : 'night',
-      fetchedAt: Date.now(),
-      source: 'fallback',
+      cycleStart: currentCycleStart,
+      cycleEnd: currentCycleEnd,
+      isDay,
+      state: isDay ? 'day' : 'night',
+      fetchedAt: now2,
+      source: 'calculated-fallback',
       error: 'All sources failed',
       responseTime: Date.now() - startTime,
     });
