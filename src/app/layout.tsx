@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { ServiceWorkerProvider } from "@/components/service-worker-provider";
 import { ToastProvider } from "@/contexts/toast-context";
